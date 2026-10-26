@@ -9,3 +9,4 @@ pkg/
 src/lyrics-term-*/
 *.pkg.tar.*
 *.tar.gz
+result
