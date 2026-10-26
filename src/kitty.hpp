@@ -38,8 +38,8 @@ public:
     Renderer(const Renderer&) = delete;
     Renderer& operator=(const Renderer&) = delete;
 
-    // dim: lower the opacity of the text (used while paused)
-    Image render(const std::string& text, int max_w, util::Rgb rgb, bool dim) {
+    // opacity: 0..1 multiplier for the text (dimming while paused, fade-in)
+    Image render(const std::string& text, int max_w, util::Rgb rgb, float opacity) {
         std::u32string up;
         for (char32_t c : util::decode_utf8(text)) up += util::to_upper(c);
         auto lines = wrap(up, max_w);
@@ -84,8 +84,8 @@ public:
                 final_alpha[i] = std::max(alpha[i], hv);
             }
         }
-        if (dim)
-            for (auto& a : final_alpha) a = static_cast<uint8_t>(a * 0.45);
+        if (opacity < 1.0f)
+            for (auto& a : final_alpha) a = static_cast<uint8_t>(a * opacity);
 
         Image img;
         img.w = w;
@@ -221,11 +221,11 @@ inline std::string image_sequence(const Image& img) {
 
 // Draws the header, the previous line, the image of the current line, a hint and the next line
 inline void draw(Renderer& r, const std::string& text, const std::string& header, const std::string& note,
-                 const std::string& prev, const std::string& next, util::Rgb rgb, bool dim, bool left) {
+                 const std::string& prev, const std::string& next, util::Rgb rgb, float opacity, bool left) {
     util::TermSize t = util::term_size();
 
     Image img;
-    if (!text.empty()) img = r.render(text, t.cols * t.cell_w, rgb, dim);
+    if (!text.empty()) img = r.render(text, t.cols * t.cell_w, rgb, opacity);
     int img_rows = img.w ? (img.h + t.cell_h - 1) / t.cell_h : 0;
     int img_cols = img.w ? (img.w + t.cell_w - 1) / t.cell_w : 0;
 

@@ -185,4 +185,44 @@ inline std::vector<LyricLine> build_units(const std::vector<LyricLine>& lines, b
     return out;
 }
 
+// All distinct synced versions lrclib knows for a track (used by the 'v' key).
+// nullopt on network error. An empty vector means no synced versions were found
+inline std::optional<std::vector<std::string>> fetch_candidates(const std::string& artist,
+                                                                const std::string& title) {
+    CURL* curl = curl_easy_init();
+    if (!curl) return std::nullopt;
+
+    char* a = curl_easy_escape(curl, artist.c_str(), static_cast<int>(artist.size()));
+    char* t = curl_easy_escape(curl, title.c_str(), static_cast<int>(title.size()));
+    std::string url = std::string("https://lrclib.net/api/search?artist_name=") + a + "&track_name=" + t;
+    curl_free(a);
+    curl_free(t);
+
+    std::string body;
+    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_cb);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &body);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 5L);
+    curl_easy_setopt(curl, CURLOPT_USERAGENT, "lyrics-term/1.1.0");
+
+    CURLcode rc = curl_easy_perform(curl);
+    long code = 0;
+    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &code);
+    curl_easy_cleanup(curl);
+    if (rc != CURLE_OK || code != 200) return std::nullopt;
+
+    std::vector<std::string> out;
+    try {
+        auto j = nlohmann::json::parse(body);
+        if (!j.is_array()) return out;
+        for (const auto& item : j) {
+            if (!item.contains("syncedLyrics") || !item["syncedLyrics"].is_string()) continue;
+            std::string s = item["syncedLyrics"].get<std::string>();
+            if (!s.empty() && std::find(out.begin(), out.end(), s) == out.end()) out.push_back(s);
+        }
+    } catch (...) {
+    }
+    return out;
+}
+
 }  // namespace lyrics

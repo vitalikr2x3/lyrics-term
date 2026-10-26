@@ -11,6 +11,7 @@
 #include <cstring>
 #include <fstream>
 #include <future>
+#include <initializer_list>
 #include <iostream>
 #include <map>
 #include <memory>
@@ -46,6 +47,7 @@ struct Options {
     bool prev_line = false;
     bool next_line = false;
     bool dim_paused = false;
+    bool fade = false;
     int vpos = 50;
     std::string export_path;
     std::string save_lrc_dir;
@@ -66,6 +68,7 @@ Colors and layout:
       --vpos N               vertical position 0-100 (default: 50)
       --rainbow              a different hue for every line
       --dim-paused           dim the text while paused
+      --fade                 fade each new line in (kitty only)
 
 Player:
       --player NAME          follow only this player (spotify, mpv...)
@@ -97,6 +100,7 @@ Rendering:
 While running:
   + / -    shift sync by 0.1 s
   0        reset the shift
+  v        switch to the next synced version of the track (if lrclib has one)
   q        quit
 
   -h, --help                 show this help
@@ -139,6 +143,7 @@ Options parse_args(int argc, char** argv) {
         else if (a == "--prev") o.prev_line = true;
         else if (a == "--next") o.next_line = true;
         else if (a == "--dim-paused") o.dim_paused = true;
+        else if (a == "--fade") o.fade = true;
         else if (a == "--export") o.export_path = need();
         else if (a == "--save-lrc") o.save_lrc_dir = need();
         else if (a == "--style") o.style = need();
@@ -268,28 +273,52 @@ int main(int argc, char** argv) {
         std::map<std::string, std::vector<LyricLine>> mem;  // parsed lyrics by track key
         std::vector<Job> jobs;                              // lookups in progress
         std::string cur_key;
+        std::string cur_artist, cur_title;
         std::vector<LyricLine> lines;
         double offset = 0.0;  // sync shift in seconds
+
+        // Other synced versions of the current track, loaded on the first 'v' press
+        std::vector<std::string> variants;
+        bool variants_loaded = false;
+        size_t variant_idx = 0;
+
         // Redraw markers: -2 forces a redraw, -3 no lyrics, -4 loading, otherwise the line index
         long last = -2;
         bool last_paused = false;
 
+        // opacity: 1.0 is normal, lower values dim the text (pause, fade-in frames)
         auto draw = [&](const std::string& header, const std::string& text, const std::string& note,
-                        const std::string& prev, const std::string& next, util::Rgb rgb, bool dim) {
-            if (use_kitty) kitty::draw(*kr, text, header, note, prev, next, rgb, dim, o.left);
-            else block::draw(text, header, note, prev, next, rgb, !o.no_bold, dim, o.left);
+                        const std::string& prev, const std::string& next, util::Rgb rgb, float opacity) {
+            if (use_kitty) kitty::draw(*kr, text, header, note, prev, next, rgb, opacity, o.left);
+            else block::draw(text, header, note, prev, next, rgb, !o.no_bold, opacity < 1.0f, o.left);
         };
 
         const std::string waiting = "Waiting for a music player (MPRIS)...";
-        draw("", "", waiting, "", "", base, false);
+        draw("", "", waiting, "", "", base, 1.0f);
 
         while (true) {
-            // 1. Keys: sync shift and quit
+            // 1. Keys: sync shift, version switch, quit
             char k = input::poll_key();
             if (k == 'q' || k == 'Q') break;
             if (k == '+' || k == '=') { offset += 0.1; last = -2; }
             else if (k == '-' || k == '_') { offset -= 0.1; last = -2; }
             else if (k == '0') { offset = 0.0; last = -2; }
+            else if (k == 'v' || k == 'V') {
+                if (!variants_loaded && !cur_artist.empty()) {
+                    auto found = lyrics::fetch_candidates(cur_artist, cur_title);
+                    variants = found ? *found : std::vector<std::string>{};
+                    variants_loaded = true;
+                    variant_idx = 0;
+                    if (!variants.empty()) {
+                        lines = lyrics::build_units(lyrics::parse_lrc(variants[0]), o.word_mode);
+                        last = -2;
+                    }
+                } else if (!variants.empty()) {
+                    variant_idx = (variant_idx + 1) % variants.size();
+                    lines = lyrics::build_units(lyrics::parse_lrc(variants[variant_idx]), o.word_mode);
+                    last = -2;
+                }
+            }
 
             // 2. Finished lookups
             for (size_t i = 0; i < jobs.size();) {
@@ -316,10 +345,14 @@ int main(int argc, char** argv) {
             if (!p) {
                 if (!cur_key.empty()) {
                     cur_key.clear();
+                    cur_artist.clear();
+                    cur_title.clear();
                     lines.clear();
+                    variants.clear();
+                    variants_loaded = false;
                     offset = 0.0;
                     last = -2;
-                    draw("", "", waiting, "", "", base, false);
+                    draw("", "", waiting, "", "", base, 1.0f);
                 }
                 std::this_thread::sleep_for(std::chrono::seconds(1));
                 continue;
@@ -329,6 +362,11 @@ int main(int argc, char** argv) {
             std::string key = p->artist + "\x1f" + p->title;
             if (key != cur_key) {
                 cur_key = key;
+                cur_artist = p->artist;
+                cur_title = p->title;
+                variants.clear();
+                variants_loaded = false;
+                variant_idx = 0;
                 last = -2;
                 offset = 0.0;
                 auto it = mem.find(key);
@@ -361,18 +399,20 @@ int main(int argc, char** argv) {
                 header += o.no_artist ? p->title : p->artist + " — " + p->title;
                 if (!o.no_source) header += "  · " + p->name;
                 if (offset != 0.0) header += "  · shift " + fmt_offset(offset);
+                if (variants_loaded && variants.size() > 1)
+                    header += "  · version " + std::to_string(variant_idx + 1) + "/" + std::to_string(variants.size());
             }
 
             // 5. Output
             if (loading) {
                 if (last != -4) {
                     last = -4;
-                    draw(header, "", "loading lyrics...", "", "", base, false);
+                    draw(header, "", "loading lyrics...", "", "", base, 1.0f);
                 }
             } else if (lines.empty()) {
                 if (last != -3) {
                     last = -3;
-                    draw(header, "", "✕ Lyrics not found", "", "", base, false);
+                    draw(header, "", "✕ Lyrics not found", "", "", base, 1.0f);
                 }
             } else {
                 double pos = p->position + offset;
@@ -401,8 +441,18 @@ int main(int argc, char** argv) {
                     std::string note;
                     if (!use_kitty && !o.no_missing) note = block::missing_note(text);
 
+                    float base_opacity = (o.dim_paused && paused) ? 0.45f : 1.0f;
                     write_export(o.export_path, text);
-                    draw(header, text, note, prev, next, line_rgb, o.dim_paused && paused);
+
+                    if (o.fade && use_kitty) {
+                        // Four frames of increasing opacity: a short fade-in of the new line
+                        for (float f : {0.25f, 0.5f, 0.75f, 1.0f}) {
+                            draw(header, text, note, prev, next, line_rgb, f * base_opacity);
+                            std::this_thread::sleep_for(std::chrono::milliseconds(60));
+                        }
+                    } else {
+                        draw(header, text, note, prev, next, line_rgb, base_opacity);
+                    }
                 }
             }
 

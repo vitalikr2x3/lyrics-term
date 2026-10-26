@@ -1,6 +1,6 @@
 # Maintainer: vitalikr2x3 <you@example.com>
 pkgname=lyrics-term
-pkgver=1.1.0
+pkgver=1.1.1
 pkgrel=1
 pkgdesc='Terminal synced lyrics for any MPRIS-compatible music player'
 arch=('x86_64')
