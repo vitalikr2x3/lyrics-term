@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.0.0-alpha1
+
+- Background lookup of other synced versions for the `v` key.
+- Unit tests (`-DLYRICS_TERM_TESTS=ON`) and a GitHub Actions workflow for Arch Linux.
+- Man page and a Quickshell widget skeleton.
+- Known limitations: not tested on a live player yet; the `v` lookup is still a single request
+  without retries; the Quickshell widget is a skeleton.
+
 ## 1.1.0
 
 - `--fade`: a new line fades in over four frames (kitty renderer only).

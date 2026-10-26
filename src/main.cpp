@@ -281,6 +281,8 @@ int main(int argc, char** argv) {
         std::vector<std::string> variants;
         bool variants_loaded = false;
         size_t variant_idx = 0;
+        std::future<std::optional<std::vector<std::string>>> variant_job;  // background 'v' lookup
+        bool variant_pending = false;
 
         // Redraw markers: -2 forces a redraw, -3 no lyrics, -4 loading, otherwise the line index
         long last = -2;
@@ -305,17 +307,27 @@ int main(int argc, char** argv) {
             else if (k == '0') { offset = 0.0; last = -2; }
             else if (k == 'v' || k == 'V') {
                 if (!variants_loaded && !cur_artist.empty()) {
-                    auto found = lyrics::fetch_candidates(cur_artist, cur_title);
-                    variants = found ? *found : std::vector<std::string>{};
+                    // Lookup runs in the background; the result is applied in step 1b below
+                    variant_job = std::async(std::launch::async, [t = cur_artist, s = cur_title]() {
+                        return lyrics::fetch_candidates(t, s);
+                    });
+                    variant_pending = true;
                     variants_loaded = true;
                     variant_idx = 0;
-                    if (!variants.empty()) {
-                        lines = lyrics::build_units(lyrics::parse_lrc(variants[0]), o.word_mode);
-                        last = -2;
-                    }
                 } else if (!variants.empty()) {
                     variant_idx = (variant_idx + 1) % variants.size();
                     lines = lyrics::build_units(lyrics::parse_lrc(variants[variant_idx]), o.word_mode);
+                    last = -2;
+                }
+            }
+
+            // 1b. Finished background version lookup
+            if (variant_pending && variant_job.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+                variant_pending = false;
+                auto found = variant_job.get();
+                variants = found ? *found : std::vector<std::string>{};
+                if (!variants.empty()) {
+                    lines = lyrics::build_units(lyrics::parse_lrc(variants[0]), o.word_mode);
                     last = -2;
                 }
             }
@@ -366,6 +378,7 @@ int main(int argc, char** argv) {
                 cur_title = p->title;
                 variants.clear();
                 variants_loaded = false;
+                variant_pending = false;  // a late result for the old track is ignored
                 variant_idx = 0;
                 last = -2;
                 offset = 0.0;
