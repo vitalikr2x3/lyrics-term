@@ -34,7 +34,7 @@
 
           meta = with pkgs.lib; {
             description = "Terminal synced lyrics for any MPRIS-compatible music player";
-            homepage = "https://github.com/vitalikr2x3/lyrics-term"\;
+            homepage = "https://github.com/vitalikr2x3/lyrics-term";
             license = licenses.mit;
             platforms = platforms.linux;
             mainProgram = "lyrics-term";
