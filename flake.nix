@@ -11,11 +11,17 @@
       packages = forAll (pkgs: {
         default = pkgs.stdenv.mkDerivation {
           pname = "lyrics-term";
-          version = "1.1.0";
+          version = "2.0.0";
 
           src = ./.;
 
-          nativeBuildInputs = [ pkgs.cmake pkgs.pkg-config ];
+          # The meson setup hook runs automatically when meson is in nativeBuildInputs
+          nativeBuildInputs = [
+            pkgs.meson
+            pkgs.ninja
+            pkgs.pkg-config
+          ];
+
           buildInputs = [
             pkgs.dbus
             pkgs.curl
@@ -23,7 +29,10 @@
             pkgs.nlohmann_json
           ];
 
-          cmakeBuildType = "Release";
+          mesonFlags = [ "-Dtests=true" ];
+
+          # Runs `meson test` against the unit tests built above
+          doCheck = true;
 
           meta = with pkgs.lib; {
             description = "Terminal synced lyrics for any MPRIS-compatible music player";
@@ -38,6 +47,7 @@
       devShells = forAll (pkgs: {
         default = pkgs.mkShell {
           inputsFrom = [ self.packages.${pkgs.system}.default ];
+          packages = [ pkgs.meson pkgs.ninja pkgs.pkg-config ];
         };
       });
     };
