@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.0.0-beta1
+
+- Feature freeze. Until 2.0.0, only bug fixes are accepted.
+- No functional changes since 2.0.0-alpha4; the README status line and this changelog are updated.
+- Known limitations: the Quickshell widget is a skeleton; `v` does not retry when lrclib returns a client error.
+
 ## 2.0.0-alpha4
 
 - README: supported players (Spotify, Audacious, mpv) with setup notes, Meson install instructions,

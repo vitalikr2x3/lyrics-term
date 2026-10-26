@@ -1,5 +1,9 @@
 # Roadmap
 
+## Beta: feature freeze
+
+- Only bug fixes until 2.0.0. New features go to 2.1.
+
 ## Done in 2.0.0-alpha4
 
 - Tested on Spotify, Audacious and mpv.
