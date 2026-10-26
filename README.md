@@ -18,7 +18,7 @@ Lyrics are fetched from [lrclib.net](https://lrclib.net) and cached on disk.
 
 ## Dependencies
 
-Arch / CachyOS:
+Arch Linux / CachyOS:
 
 ```bash
 sudo pacman -S --needed base-devel cmake pkgconf dbus curl freetype2 nlohmann-json noto-fonts ttf-dejavu
@@ -29,13 +29,17 @@ The kitty renderer needs kitty itself. To read colors from kitty's palette
 
 ## Installation
 
-### From the AUR
+### Arch Linux (makepkg)
 
 ```bash
-yay -S lyrics-term
+git clone https://github.com/vitalikr2x3/lyrics-term.git
+cd lyrics-term
+makepkg -si
 ```
 
-### From source
+This builds a package from the tagged release and installs it with pacman.
+
+### Other distributions (CMake)
 
 ```bash
 git clone https://github.com/vitalikr2x3/lyrics-term.git
