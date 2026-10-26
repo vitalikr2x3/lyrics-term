@@ -1,6 +1,6 @@
 pkgbase = lyrics-term
 	pkgdesc = Terminal synced lyrics for any MPRIS-compatible music player
-	pkgver = 1.1.0
+	pkgver = 1.1.1
 	pkgrel = 1
 	url = https://github.com/vitalikr2x3/lyrics-term
 	arch = x86_64
@@ -15,7 +15,7 @@ pkgbase = lyrics-term
 	optdepends = noto-fonts: default font for the kitty renderer
 	optdepends = ttf-dejavu: fallback font for the kitty renderer
 	options = !debug
-	source = lyrics-term-1.1.0.tar.gz::https://github.com/vitalikr2x3/lyrics-term/archive/refs/tags/v1.1.0.tar.gz
-	sha256sums = 3248d51ff06b34aad14ab091f518a81d6d46bfcc6a73b70eda8137c0438832a7
+	source = lyrics-term-1.1.1.tar.gz::https://github.com/vitalikr2x3/lyrics-term/archive/refs/tags/v1.1.1.tar.gz
+	sha256sums = 99bea52f6401f5355f32d1a59b5831ee0c454a332a5b92c67df406622acc511c
 
 pkgname = lyrics-term
