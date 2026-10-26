@@ -14,6 +14,7 @@ pkgbase = lyrics-term
 	optdepends = kitty: graphical renderer (--renderer kitty)
 	optdepends = noto-fonts: default font for the kitty renderer
 	optdepends = ttf-dejavu: fallback font for the kitty renderer
+	options = !debug
 	source = lyrics-term-1.0.0.tar.gz::https://github.com/vitalikr2x3/lyrics-term/archive/refs/tags/v1.0.0.tar.gz
 	sha256sums = 26629f4d9c6948456ea0599dcffb7d134a7196068de1dd237272fb6958d7958b
 

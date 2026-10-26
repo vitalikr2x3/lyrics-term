@@ -6,6 +6,7 @@ pkgdesc='Terminal synced lyrics for any MPRIS-compatible music player'
 arch=('x86_64')
 url="https://github.com/vitalikr2x3/lyrics-term"
 license=('MIT')
+options=('!debug')
 depends=('dbus' 'curl' 'freetype2' 'nlohmann-json')
 makedepends=('cmake' 'pkgconf')
 optdepends=(
