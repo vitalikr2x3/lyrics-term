@@ -1,0 +1,10 @@
+build/
+cmake-build-*/
+.cache/
+*.tmp
+.vscode/
+.idea/
+.DS_Store
+pkg/
+src/lyrics-term-*/
+*.pkg.tar.*
