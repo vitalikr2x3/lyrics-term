@@ -1,11 +1,12 @@
 #pragma once
-// Lyrics: lookup on lrclib.net, disk cache, .lrc saving, LRC parsing.
+// Lyrics: lookup on lrclib.net, disk cache, .lrc saving, LRC parsing, version candidates.
 
 #include <curl/curl.h>
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
 #include <cctype>
+#include <chrono>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -13,6 +14,7 @@
 #include <sstream>
 #include <string>
 #include <system_error>
+#include <thread>
 #include <vector>
 
 struct LyricLine {
@@ -35,23 +37,17 @@ inline std::string trim(const std::string& s) {
     return s.substr(b, e - b + 1);
 }
 
-// nullopt: network error (not cached). Empty string: no synced lyrics. Otherwise: syncedLyrics
-inline std::optional<std::string> fetch_synced(const std::string& artist, const std::string& title) {
+// Performs one GET request. Returns {HTTP code, body}, or nullopt on a transport error
+inline std::optional<std::pair<long, std::string>> http_get(const std::string& url) {
     CURL* curl = curl_easy_init();
     if (!curl) return std::nullopt;
-
-    char* a = curl_easy_escape(curl, artist.c_str(), static_cast<int>(artist.size()));
-    char* t = curl_easy_escape(curl, title.c_str(), static_cast<int>(title.size()));
-    std::string url = std::string("https://lrclib.net/api/get?artist_name=") + a + "&track_name=" + t;
-    curl_free(a);
-    curl_free(t);
 
     std::string body;
     curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_cb);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &body);
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, 5L);
-    curl_easy_setopt(curl, CURLOPT_USERAGENT, "lyrics-term/1.0");
+    curl_easy_setopt(curl, CURLOPT_USERAGENT, "lyrics-term/2.0.0");
 
     CURLcode rc = curl_easy_perform(curl);
     long code = 0;
@@ -59,11 +55,30 @@ inline std::optional<std::string> fetch_synced(const std::string& artist, const 
     curl_easy_cleanup(curl);
 
     if (rc != CURLE_OK) return std::nullopt;
-    if (code == 404) return std::string();
-    if (code != 200) return std::nullopt;
+    return std::make_pair(code, body);
+}
+
+// URL-encodes a value for a query string
+inline std::string escape(const std::string& value) {
+    CURL* curl = curl_easy_init();
+    if (!curl) return value;
+    char* e = curl_easy_escape(curl, value.c_str(), static_cast<int>(value.size()));
+    std::string out = e ? e : value;
+    curl_free(e);
+    curl_easy_cleanup(curl);
+    return out;
+}
+
+// nullopt: network error (not cached). Empty string: no synced lyrics. Otherwise: syncedLyrics
+inline std::optional<std::string> fetch_synced(const std::string& artist, const std::string& title) {
+    std::string url = "https://lrclib.net/api/get?artist_name=" + escape(artist) + "&track_name=" + escape(title);
+    auto res = http_get(url);
+    if (!res) return std::nullopt;
+    if (res->first == 404) return std::string();
+    if (res->first != 200) return std::nullopt;
 
     try {
-        auto j = nlohmann::json::parse(body);
+        auto j = nlohmann::json::parse(res->second);
         if (j.contains("syncedLyrics") && j["syncedLyrics"].is_string())
             return j["syncedLyrics"].get<std::string>();
     } catch (...) {
@@ -185,32 +200,9 @@ inline std::vector<LyricLine> build_units(const std::vector<LyricLine>& lines, b
     return out;
 }
 
-// All distinct synced versions lrclib knows for a track (used by the 'v' key).
-// nullopt on network error. An empty vector means no synced versions were found
-inline std::optional<std::vector<std::string>> fetch_candidates(const std::string& artist,
-                                                                const std::string& title) {
-    CURL* curl = curl_easy_init();
-    if (!curl) return std::nullopt;
-
-    char* a = curl_easy_escape(curl, artist.c_str(), static_cast<int>(artist.size()));
-    char* t = curl_easy_escape(curl, title.c_str(), static_cast<int>(title.size()));
-    std::string url = std::string("https://lrclib.net/api/search?artist_name=") + a + "&track_name=" + t;
-    curl_free(a);
-    curl_free(t);
-
-    std::string body;
-    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_cb);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &body);
-    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 5L);
-    curl_easy_setopt(curl, CURLOPT_USERAGENT, "lyrics-term/1.1.0");
-
-    CURLcode rc = curl_easy_perform(curl);
-    long code = 0;
-    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &code);
-    curl_easy_cleanup(curl);
-    if (rc != CURLE_OK || code != 200) return std::nullopt;
-
+// Extracts distinct non-empty syncedLyrics values from a /api/search response body.
+// Invalid JSON or a non-array body gives an empty result. No network access here, so it is testable
+inline std::vector<std::string> parse_candidates_json(const std::string& body) {
     std::vector<std::string> out;
     try {
         auto j = nlohmann::json::parse(body);
@@ -221,8 +213,26 @@ inline std::optional<std::vector<std::string>> fetch_candidates(const std::strin
             if (!s.empty() && std::find(out.begin(), out.end(), s) == out.end()) out.push_back(s);
         }
     } catch (...) {
+        out.clear();
     }
     return out;
+}
+
+// All distinct synced versions lrclib knows for a track (used by the 'v' key).
+// Retries transient failures (transport errors and HTTP 5xx) up to three times.
+// nullopt: every attempt failed. Empty vector: the request worked and no synced version exists
+inline std::optional<std::vector<std::string>> fetch_candidates(const std::string& artist,
+                                                                const std::string& title) {
+    std::string url = "https://lrclib.net/api/search?artist_name=" + escape(artist) +
+                      "&track_name=" + escape(title);
+    constexpr int kAttempts = 3;
+    for (int attempt = 1; attempt <= kAttempts; ++attempt) {
+        auto res = http_get(url);
+        if (res && res->first == 200) return parse_candidates_json(res->second);
+        if (res && res->first >= 400 && res->first < 500) return std::nullopt;  // no point retrying
+        if (attempt < kAttempts) std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    }
+    return std::nullopt;
 }
 
 }  // namespace lyrics

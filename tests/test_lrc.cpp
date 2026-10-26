@@ -50,6 +50,26 @@ void test_line_mode_unchanged() {
     CHECK(out.size() == in.size());
 }
 
+// Made-up strings only: the test checks the JSON handling, not any real lyrics
+void test_candidates_json() {
+    auto c = lyrics::parse_candidates_json(
+        R"([{"syncedLyrics":"[00:01.00] alpha"},{"syncedLyrics":"[00:01.00] alpha"},)"
+        R"({"syncedLyrics":null},{"plainLyrics":"no sync"},{"syncedLyrics":""},)"
+        R"({"syncedLyrics":"[00:02.00] beta"}])");
+    CHECK(c.size() == 2);
+    if (c.size() == 2) {
+        CHECK(c[0] == "[00:01.00] alpha");
+        CHECK(c[1] == "[00:02.00] beta");
+    }
+}
+
+void test_candidates_bad_input() {
+    CHECK(lyrics::parse_candidates_json("").empty());
+    CHECK(lyrics::parse_candidates_json("not json").empty());
+    CHECK(lyrics::parse_candidates_json(R"({"syncedLyrics":"[00:01.00] x"})").empty());  // object, not array
+    CHECK(lyrics::parse_candidates_json("[]").empty());
+}
+
 void test_safe_name() {
     CHECK(lyrics::safe_name("a/b:c") == "a_b_c");
     CHECK(lyrics::safe_name("plain name") == "plain name");
@@ -62,6 +82,8 @@ int main() {
     test_parse_lrc_empty();
     test_word_mode();
     test_line_mode_unchanged();
+    test_candidates_json();
+    test_candidates_bad_input();
     test_safe_name();
 
     if (failures) {

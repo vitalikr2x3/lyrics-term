@@ -283,6 +283,7 @@ int main(int argc, char** argv) {
         size_t variant_idx = 0;
         std::future<std::optional<std::vector<std::string>>> variant_job;  // background 'v' lookup
         bool variant_pending = false;
+        std::string variant_note;  // header hint: "versions unavailable" or "no other versions"
 
         // Redraw markers: -2 forces a redraw, -3 no lyrics, -4 loading, otherwise the line index
         long last = -2;
@@ -312,6 +313,7 @@ int main(int argc, char** argv) {
                         return lyrics::fetch_candidates(t, s);
                     });
                     variant_pending = true;
+                    variant_note = "looking for versions...";
                     variants_loaded = true;
                     variant_idx = 0;
                 } else if (!variants.empty()) {
@@ -326,6 +328,9 @@ int main(int argc, char** argv) {
                 variant_pending = false;
                 auto found = variant_job.get();
                 variants = found ? *found : std::vector<std::string>{};
+                if (!found) variant_note = "versions unavailable";
+                else if (variants.size() <= 1) variant_note = "no other versions";
+                else variant_note.clear();
                 if (!variants.empty()) {
                     lines = lyrics::build_units(lyrics::parse_lrc(variants[0]), o.word_mode);
                     last = -2;
@@ -379,6 +384,7 @@ int main(int argc, char** argv) {
                 variants.clear();
                 variants_loaded = false;
                 variant_pending = false;  // a late result for the old track is ignored
+                variant_note.clear();
                 variant_idx = 0;
                 last = -2;
                 offset = 0.0;
@@ -414,6 +420,8 @@ int main(int argc, char** argv) {
                 if (offset != 0.0) header += "  · shift " + fmt_offset(offset);
                 if (variants_loaded && variants.size() > 1)
                     header += "  · version " + std::to_string(variant_idx + 1) + "/" + std::to_string(variants.size());
+                else if (!variant_note.empty())
+                    header += "  · " + variant_note;
             }
 
             // 5. Output

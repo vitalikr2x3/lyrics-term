@@ -1,5 +1,10 @@
 # Roadmap
 
+## Done in 2.0.0-alpha2
+
+- Retries for version lookups, and header hints for missing versions.
+- Candidate JSON parsing covered by unit tests.
+
 ## Done in 2.0.0-alpha1
 
 - Background lookup of other synced versions (`v` key no longer blocks the loop).

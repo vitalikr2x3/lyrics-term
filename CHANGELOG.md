@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.0.0-alpha2
+
+- `v` lookups retry transient network errors (up to three attempts, 500 ms apart). Client errors are not retried.
+- The header shows a hint when versions are unavailable ("versions unavailable") or when the track has no other
+  synced version ("no other versions"), and "looking for versions..." while the request runs.
+- JSON parsing of lrclib search results moved into `parse_candidates_json`, which is covered by unit tests.
+- Unit tests for candidate parsing use made-up input; no network access is needed to run them.
+
 ## 2.0.0-alpha1
 
 - Background lookup of other synced versions for the `v` key.
