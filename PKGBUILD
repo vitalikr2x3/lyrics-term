@@ -15,7 +15,7 @@ optdepends=(
   'ttf-dejavu: fallback font for the kitty renderer'
 )
 source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('26629f4d9c6948456ea0599dcffb7d134a7196068de1dd237272fb6958d7958b')
+sha256sums=('3248d51ff06b34aad14ab091f518a81d6d46bfcc6a73b70eda8137c0438832a7')
 
 build() {
   cmake -B build -S "$pkgname-$pkgver" \
