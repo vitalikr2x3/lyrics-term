@@ -18,12 +18,10 @@ source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
 sha256sums=('99bea52f6401f5355f32d1a59b5831ee0c454a332a5b92c67df406622acc511c')
 
 build() {
-  cmake -B build -S "$pkgname-$pkgver" \
-    -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_INSTALL_PREFIX=/usr
-  cmake --build build
+  arch-meson "$pkgname-$pkgver" build
+  meson compile -C build
 }
 
 package() {
-  DESTDIR="$pkgdir" cmake --install build
+  meson install -C build --destdir "$pkgdir"
 }

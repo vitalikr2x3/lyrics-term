@@ -1,5 +1,9 @@
 # Roadmap
 
+## Done in 2.0.0-alpha3
+
+- Build system moved to Meson (CMake removed).
+
 ## Done in 2.0.0-alpha2
 
 - Retries for version lookups, and header hints for missing versions.

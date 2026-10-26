@@ -15,7 +15,6 @@
 
           src = ./.;
 
-          # The meson setup hook runs automatically when meson is in nativeBuildInputs
           nativeBuildInputs = [
             pkgs.meson
             pkgs.ninja
@@ -31,12 +30,11 @@
 
           mesonFlags = [ "-Dtests=true" ];
 
-          # Runs `meson test` against the unit tests built above
           doCheck = true;
 
           meta = with pkgs.lib; {
             description = "Terminal synced lyrics for any MPRIS-compatible music player";
-            homepage = "https://github.com/vitalikr2x3/lyrics-term";
+            homepage = "https://github.com/vitalikr2x3/lyrics-term"\;
             license = licenses.mit;
             platforms = platforms.linux;
             mainProgram = "lyrics-term";

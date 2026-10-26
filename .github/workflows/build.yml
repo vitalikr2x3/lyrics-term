@@ -16,16 +16,16 @@ jobs:
           pacman-key --init
           pacman-key --populate archlinux
           pacman -Syu --noconfirm
-          pacman -S --noconfirm --needed base-devel cmake pkgconf dbus curl freetype2 nlohmann-json
+          pacman -S --noconfirm --needed base-devel meson ninja pkgconf dbus curl freetype2 nlohmann-json
 
       - name: Configure
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DLYRICS_TERM_TESTS=ON
+        run: meson setup build -Dtests=true --buildtype=release
 
       - name: Build
-        run: cmake --build build -j
+        run: meson compile -C build
 
       - name: Unit tests
-        run: ctest --test-dir build --output-on-failure
+        run: meson test -C build --print-errorlogs
 
       - name: Smoke test
         run: ./build/lyrics-term --help | head -n 1

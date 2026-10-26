@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.0.0-alpha3
+
+- Build system switched from CMake to Meson. Configure with `meson setup build -Dtests=true`,
+  build with `meson compile -C build`, test with `meson test -C build`, install with `meson install -C build`.
+- CI workflow uses Meson and runs the same commands.
+- The man page is installed through `install_man`.
+
 ## 2.0.0-alpha2
 
 - `v` lookups retry transient network errors (up to three attempts, 500 ms apart). Client errors are not retried.
