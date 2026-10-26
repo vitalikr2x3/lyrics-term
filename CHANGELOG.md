@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.0.0-alpha4
+
+- README: supported players (Spotify, Audacious, mpv) with setup notes, Meson install instructions,
+  and the alpha status.
+- PKGBUILD uses Meson (`arch-meson`, `meson compile`, `meson test`, `meson install`) instead of CMake.
+- Tested on Spotify, Audacious and mpv (with `mpv-mpris`).
+
 ## 2.0.0-alpha3
 
 - Build system switched from CMake to Meson. Configure with `meson setup build -Dtests=true`,

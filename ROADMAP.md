@@ -1,5 +1,10 @@
 # Roadmap
 
+## Done in 2.0.0-alpha4
+
+- Tested on Spotify, Audacious and mpv.
+- PKGBUILD and README updated for Meson.
+
 ## Done in 2.0.0-alpha3
 
 - Build system moved to Meson (CMake removed).
