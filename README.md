@@ -38,7 +38,7 @@ yay -S lyrics-term
 ### From source
 
 ```bash
-git clone https://github.com/USERNAME/lyrics-term.git
+git clone https://github.com/vitalikr2x3/lyrics-term.git
 cd lyrics-term
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j

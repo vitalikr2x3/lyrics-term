@@ -1,10 +1,10 @@
-# Maintainer: USERNAME <you@example.com>
+# Maintainer: vitalikr2x3 <you@example.com>
 pkgname=lyrics-term
 pkgver=1.0.0
 pkgrel=1
 pkgdesc='Terminal synced lyrics for any MPRIS-compatible music player'
 arch=('x86_64')
-url="https://github.com/USERNAME/lyrics-term"
+url="https://github.com/vitalikr2x3/lyrics-term"
 license=('MIT')
 depends=('dbus' 'curl' 'freetype2' 'nlohmann-json')
 makedepends=('cmake' 'pkgconf')
