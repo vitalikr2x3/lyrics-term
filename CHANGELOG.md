@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.0.0-beta2
+
+- Fixed flicker with `--fade` in kitty: the text no longer disappears during a fade. The screen is erased line by line
+  instead of a full clear, and the new image is placed before the previous one is deleted.
+
 ## 2.0.0-beta1
 
 - Feature freeze. Until 2.0.0, only bug fixes are accepted.

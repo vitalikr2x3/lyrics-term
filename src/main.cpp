@@ -289,6 +289,11 @@ int main(int argc, char** argv) {
         long last = -2;
         bool last_paused = false;
 
+        // Easter egg: type "lyrics" while the program runs for ten seconds of rainbow colors
+        std::string key_buf;
+        std::chrono::steady_clock::time_point secret_until{};
+        bool last_secret = false;
+
         // opacity: 1.0 is normal, lower values dim the text (pause, fade-in frames)
         auto draw = [&](const std::string& header, const std::string& text, const std::string& note,
                         const std::string& prev, const std::string& next, util::Rgb rgb, float opacity) {
@@ -303,6 +308,14 @@ int main(int argc, char** argv) {
             // 1. Keys: sync shift, version switch, quit
             char k = input::poll_key();
             if (k == 'q' || k == 'Q') break;
+            if (k) {
+                key_buf += k;
+                if (key_buf.size() > 16) key_buf.erase(0, key_buf.size() - 16);
+                if (key_buf.size() >= 6 && key_buf.compare(key_buf.size() - 6, 6, "lyrics") == 0) {
+                    secret_until = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+                    key_buf.clear();
+                }
+            }
             if (k == '+' || k == '=') { offset += 0.1; last = -2; }
             else if (k == '-' || k == '_') { offset -= 0.1; last = -2; }
             else if (k == '0') { offset = 0.0; last = -2; }
@@ -412,12 +425,19 @@ int main(int argc, char** argv) {
             bool loading = std::any_of(jobs.begin(), jobs.end(), [&](const Job& j) { return j.key == cur_key; });
             bool paused = p->status == "Paused" || p->status == "Stopped";
 
+            bool secret = std::chrono::steady_clock::now() < secret_until;
+            if (secret != last_secret) {
+                last_secret = secret;
+                last = -2;  // redraw when the effect starts or ends
+            }
+
             std::string header;
             if (!o.no_header) {
                 header = "🎵 ";
                 header += o.no_artist ? p->title : p->artist + " — " + p->title;
                 if (!o.no_source) header += "  · " + p->name;
                 if (offset != 0.0) header += "  · shift " + fmt_offset(offset);
+                if (secret) header += "  · ♪";
                 if (variants_loaded && variants.size() > 1)
                     header += "  · version " + std::to_string(variant_idx + 1) + "/" + std::to_string(variants.size());
                 else if (!variant_note.empty())
@@ -456,7 +476,7 @@ int main(int argc, char** argv) {
                         next = lines[static_cast<size_t>(idx + 1)].text;
 
                     util::Rgb line_rgb = base;
-                    if (o.rainbow && idx >= 0)
+                    if ((o.rainbow || secret) && idx >= 0)
                         line_rgb = util::hsv_to_rgb(static_cast<double>(idx) * 35.0, 0.75, 1.0);
 
                     std::string note;
