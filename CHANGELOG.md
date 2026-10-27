@@ -1,5 +1,22 @@
 # Changelog
 
+## 2.0.0
+
+First stable release of the 2.0 line. Everything from the alphas and betas is included.
+
+### Highlights
+- Background lookups: the screen never freezes while lyrics or other versions load.
+- `v` switches between other synced versions of a track, with retries and header hints.
+- `--fade` fades new lines in (kitty), without flicker.
+- Pasting of `--export` output into status bars: the current line goes to a file atomically.
+- Works with Spotify, Audacious and mpv (with `mpv-mpris`).
+- Built with Meson; CI builds and tests on Arch Linux; `flake.nix` builds with Meson and runs the tests.
+- Man page and a Quickshell widget skeleton.
+
+### Known limitations
+- The Quickshell widget is a skeleton.
+- `v` does not retry on client errors (4xx).
+
 ## 2.0.0-beta2
 
 - Fixed flicker with `--fade` in kitty: the text no longer disappears during a fade. The screen is erased line by line

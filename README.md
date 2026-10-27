@@ -5,7 +5,7 @@ and draws the current line either with a built-in block font or as an image in k
 
 Lyrics come from [lrclib.net](https://lrclib.net) and are cached on disk.
 
-**Status: 2.0.0-beta1.** Feature freeze: only bug fixes until 2.0.0. Tested on Spotify, Audacious and mpv. Please report problems on the issue tracker.
+**Status: 2.0.0, stable.** Tested on Spotify, Audacious and mpv. Report problems on the issue tracker.
 
 ## Features
 
