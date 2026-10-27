@@ -130,6 +130,54 @@ inline std::optional<std::string> load_synced(const std::string& artist, const s
     return fetched;
 }
 
+// Finds a local .lrc for a track: "Artist - Title.lrc" in the folder first, then any .lrc in the
+// folder tree whose file name contains both the artist and the title (case-insensitive).
+// Returns an empty string if nothing matches
+inline std::string find_local_lrc(const std::string& dir, const std::string& artist, const std::string& title) {
+    namespace fs = std::filesystem;
+    std::error_code ec;
+    if (dir.empty() || (artist.empty() && title.empty()) || !fs::is_directory(dir, ec)) return {};
+
+    fs::path exact = fs::path(dir) / (safe_name(artist + " - " + title) + ".lrc");
+    if (fs::exists(exact, ec)) return exact.string();
+
+    auto lower = [](std::string s) {
+        for (auto& c : s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        return s;
+    };
+    const std::string a = lower(artist), t = lower(title);
+
+    fs::recursive_directory_iterator it(dir, fs::directory_options::skip_permission_denied, ec);
+    fs::recursive_directory_iterator end;
+    for (; !ec && it != end; it.increment(ec)) {
+        const fs::path& p = it->path();
+        if (p.extension() != ".lrc" || !it->is_regular_file(ec)) continue;
+        std::string name = lower(p.filename().string());
+        if ((a.empty() || name.find(a) != std::string::npos) && (t.empty() || name.find(t) != std::string::npos))
+            return p.string();
+    }
+    return {};
+}
+
+// Lookup order for one track:
+//   auto:   local folder, then cache, then lrclib
+//   local:  local folder only
+//   lrclib: cache and lrclib, folder skipped
+inline std::optional<std::string> load_track(const std::string& artist, const std::string& title,
+                                             const std::string& backend, const std::string& lyrics_dir) {
+    if (backend == "auto" || backend == "local") {
+        std::string path = find_local_lrc(lyrics_dir, artist, title);
+        if (!path.empty()) {
+            std::ifstream in(path, std::ios::binary);
+            std::ostringstream ss;
+            ss << in.rdbuf();
+            if (!ss.str().empty()) return ss.str();
+        }
+        if (backend == "local") return std::string();
+    }
+    return load_synced(artist, title);
+}
+
 // Saves a found synced text into a directory (used by --save-lrc)
 inline void save_lrc(const std::string& dir, const std::string& artist, const std::string& title,
                      const std::string& text) {

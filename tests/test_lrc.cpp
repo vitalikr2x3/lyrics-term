@@ -1,6 +1,8 @@
 // Unit tests for the parts of lyrics.hpp that do not need a network or a player.
 
 #include <cstdio>
+#include <filesystem>
+#include <fstream>
 
 #include "lyrics.hpp"
 
@@ -70,6 +72,23 @@ void test_candidates_bad_input() {
     CHECK(lyrics::parse_candidates_json("[]").empty());
 }
 
+// Local folder lookup: exact name in the root, and a fuzzy match in a subfolder
+void test_find_local_lrc() {
+    namespace fs = std::filesystem;
+    fs::path dir = fs::temp_directory_path() / "lyrics-term-test";
+    fs::remove_all(dir);
+    fs::create_directories(dir / "sub");
+    {
+        std::ofstream out(dir / "sub" / "Some Artist - Some Title.lrc");
+        out << "[00:01.00] line\n";
+    }
+    CHECK(lyrics::find_local_lrc(dir.string(), "Some Artist", "Some Title").find("Some Title.lrc") != std::string::npos);
+    CHECK(lyrics::find_local_lrc(dir.string(), "some artist", "SOME TITLE").find("Some Title.lrc") != std::string::npos);
+    CHECK(lyrics::find_local_lrc(dir.string(), "Nobody", "Nothing").empty());
+    CHECK(lyrics::find_local_lrc("/no/such/dir/anywhere", "Some Artist", "Some Title").empty());
+    fs::remove_all(dir);
+}
+
 void test_safe_name() {
     CHECK(lyrics::safe_name("a/b:c") == "a_b_c");
     CHECK(lyrics::safe_name("plain name") == "plain name");
@@ -84,6 +103,7 @@ int main() {
     test_line_mode_unchanged();
     test_candidates_json();
     test_candidates_bad_input();
+    test_find_local_lrc();
     test_safe_name();
 
     if (failures) {

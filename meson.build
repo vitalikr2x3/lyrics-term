@@ -1,5 +1,5 @@
 project('lyrics-term', 'cpp',
-  version : '2.0.0',
+  version : '2.1.0',
   default_options : [
     'cpp_std=gnu++17',  # popen/pclose need the GNU/POSIX extensions
     'warning_level=3',

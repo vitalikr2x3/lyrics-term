@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.1.0
+
+- Local lyrics: lyrics are looked up first in a folder of `.lrc` files (`--lyrics-dir`, default `~/Lyrics`),
+  matching the Caelestia shell's naming (`Artist - Title.lrc`), then in the cache and lrclib.
+- `--backend auto|local|lrclib` chooses the source: `auto` (default), `local` (folder only), `lrclib` (cache and lrclib only).
+- Unit test for the local folder lookup.
+- `--headless` runs in the background: the terminal is no longer switched to raw mode in headless mode.
+
+## 2.0.1
+
+- New `--headless` mode: nothing is drawn, the current line is only written to the `--export` file.
+  Used by the Quickshell lyrics shell (`integrations/quickshell/lyrics-shell`).
+- The `--export` file is cleared when there is no player, while loading, and when no lyrics are found.
+
 ## 2.0.0
 
 First stable release of the 2.0 line. Everything from the alphas and betas is included.

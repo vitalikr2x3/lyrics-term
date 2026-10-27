@@ -1,6 +1,6 @@
 # Maintainer: vitalikr2x3 <vitalikr2x3@users.noreply.github.com>
 pkgname=lyrics-term
-pkgver=2.0.0
+pkgver=2.1.0
 pkgrel=1
 pkgdesc='Terminal synced lyrics for any MPRIS-compatible music player'
 arch=('x86_64')
@@ -16,7 +16,7 @@ optdepends=(
   'mpv-mpris: MPRIS support for mpv'
 )
 source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('0e987521fbe50b93eaebd1a1f3a56538dddd8353def4bfe6e1af023000412569')
+sha256sums=('SKIP')  # run updpkgsums once the v2.0.0 tag exists
 
 build() {
   arch-meson "$pkgname-$pkgver" build

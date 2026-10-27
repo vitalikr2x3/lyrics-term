@@ -48,6 +48,9 @@ struct Options {
     bool next_line = false;
     bool dim_paused = false;
     bool fade = false;
+    bool headless = false;
+    std::string backend = "auto";  // auto | local | lrclib
+    std::string lyrics_dir;         // folder with .lrc files; default: ~/Lyrics  // draw nothing; only write the --export file (for Quickshell and bars)
     int vpos = 50;
     std::string export_path;
     std::string save_lrc_dir;
@@ -69,6 +72,11 @@ Colors and layout:
       --rainbow              a different hue for every line
       --dim-paused           dim the text while paused
       --fade                 fade each new line in (kitty only)
+      --headless             draw nothing; only write the --export file (for Quickshell and bars)
+      --backend auto|local|lrclib
+                             where lyrics come from: local folder, then cache and lrclib (auto, default),
+                             local folder only, or cache and lrclib only
+      --lyrics-dir PATH      folder with .lrc files (default: ~/Lyrics)
 
 Player:
       --player NAME          follow only this player (spotify, mpv...)
@@ -144,6 +152,13 @@ Options parse_args(int argc, char** argv) {
         else if (a == "--next") o.next_line = true;
         else if (a == "--dim-paused") o.dim_paused = true;
         else if (a == "--fade") o.fade = true;
+        else if (a == "--headless") o.headless = true;
+        else if (a == "--backend") {
+            o.backend = need();
+            if (o.backend != "auto" && o.backend != "local" && o.backend != "lrclib")
+                throw std::runtime_error("--backend must be auto, local or lrclib");
+        }
+        else if (a == "--lyrics-dir") o.lyrics_dir = need();
         else if (a == "--export") o.export_path = need();
         else if (a == "--save-lrc") o.save_lrc_dir = need();
         else if (a == "--style") o.style = need();
@@ -231,6 +246,10 @@ int main(int argc, char** argv) {
     try {
         Options o = parse_args(argc, argv);
         util::g_vpos = std::clamp(o.vpos, 0, 100);
+        if (o.lyrics_dir.empty()) {
+            const char* home = std::getenv("HOME");
+            o.lyrics_dir = home ? std::string(home) + "/Lyrics" : std::string();
+        }
 
         if (o.list_players) {
             Mpris m;
@@ -264,7 +283,7 @@ int main(int argc, char** argv) {
         if (use_kitty) kr = std::make_unique<kitty::Renderer>(resolve_font(o, st), o.font_size, spacing, glow);
 
         curl_global_init(CURL_GLOBAL_DEFAULT);
-        input::enable_raw();
+        if (!o.headless) input::enable_raw();  // no raw terminal in headless mode, so it can run in the background
         std::atexit(input::restore);
         std::signal(SIGINT, on_sigint);
         std::signal(SIGTERM, on_sigint);
@@ -297,6 +316,7 @@ int main(int argc, char** argv) {
         // opacity: 1.0 is normal, lower values dim the text (pause, fade-in frames)
         auto draw = [&](const std::string& header, const std::string& text, const std::string& note,
                         const std::string& prev, const std::string& next, util::Rgb rgb, float opacity) {
+            if (o.headless) return;  // no terminal output in headless mode
             if (use_kitty) kitty::draw(*kr, text, header, note, prev, next, rgb, opacity, o.left);
             else block::draw(text, header, note, prev, next, rgb, !o.no_bold, opacity < 1.0f, o.left);
         };
@@ -376,6 +396,7 @@ int main(int argc, char** argv) {
                 if (!cur_key.empty()) {
                     cur_key.clear();
                     cur_artist.clear();
+                    write_export(o.export_path, "");
                     cur_title.clear();
                     lines.clear();
                     variants.clear();
@@ -413,10 +434,11 @@ int main(int argc, char** argv) {
                         j.artist = p->artist;
                         j.title = p->title;
                         std::string artist = p->artist, title = p->title;
-                        j.result = std::async(std::launch::async, [artist, title]() -> std::optional<std::string> {
-                            if (artist.empty()) return std::string();
-                            return lyrics::load_synced(artist, title);
-                        });
+                        j.result = std::async(std::launch::async,
+                            [artist, title, backend = o.backend, dir = o.lyrics_dir]() -> std::optional<std::string> {
+                                if (artist.empty()) return std::string();
+                                return lyrics::load_track(artist, title, backend, dir);
+                            });
                         jobs.push_back(std::move(j));
                     }
                 }
@@ -448,11 +470,13 @@ int main(int argc, char** argv) {
             if (loading) {
                 if (last != -4) {
                     last = -4;
+                    write_export(o.export_path, "");
                     draw(header, "", "loading lyrics...", "", "", base, 1.0f);
                 }
             } else if (lines.empty()) {
                 if (last != -3) {
                     last = -3;
+                    write_export(o.export_path, "");
                     draw(header, "", "✕ Lyrics not found", "", "", base, 1.0f);
                 }
             } else {
