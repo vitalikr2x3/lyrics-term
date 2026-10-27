@@ -16,7 +16,7 @@ optdepends=(
   'mpv-mpris: MPRIS support for mpv'
 )
 source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('SKIP')  # run updpkgsums once the v2.0.0 tag exists
+sha256sums=('0e987521fbe50b93eaebd1a1f3a56538dddd8353def4bfe6e1af023000412569')
 
 build() {
   arch-meson "$pkgname-$pkgver" build
