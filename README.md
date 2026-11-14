@@ -1,5 +1,7 @@
 # lyrics-term
 
+> **Branches:** `main` is lyrics-term 3.x (C++, Linux and Windows). The 2.x line (C++ with CMake, Linux only) lives in the `v2-line` branch.
+
 Terminal player for synced song lyrics. It works with any MPRIS-compatible player
 and draws the current line either with a built-in block font or as an image in kitty.
 
