@@ -1,0 +1,127 @@
+.TH LYRICS-TERM 1 "2026" "2.0.0-alpha" "User Commands"
+.SH NAME
+lyrics-term \- synced song lyrics for MPRIS music players
+.SH SYNOPSIS
+.B lyrics-term
+[\fIOPTIONS\fR]
+.br
+.B lyrics-term
+\fB\-\-list\-players\fR
+.SH DESCRIPTION
+.B lyrics-term
+follows the music player that is currently playing over MPRIS, fetches synced
+lyrics from lrclib.net and shows the current line in the terminal. The line is
+drawn with a built-in block font, or as a true-font image when run in kitty.
+.SH OPTIONS
+.SS Colors and layout
+.TP
+.BR \-c ", " \-\-color " " \fICOLOR\fR
+Name (cyan, green, red, yellow, blue, magenta, white) or HEX value (#00ffcc).
+.TP
+.BI \-\-from\-kitty " COLOR"
+Color from the kitty palette (color0 to color15, foreground) or HEX.
+.TP
+.BI \-\-align " left|center"
+Horizontal alignment. Default: center.
+.TP
+.BI \-\-vpos " N"
+Vertical position from 0 (top) to 100 (bottom). Default: 50.
+.TP
+.B \-\-rainbow
+Give every line its own hue.
+.TP
+.B \-\-dim\-paused
+Dim the text while the player is paused.
+.TP
+.B \-\-fade
+Fade each new line in over four frames (kitty only).
+.SS Player
+.TP
+.BI \-\-player " NAME"
+Follow only the player whose name contains NAME (spotify, mpv, audacious).
+.TP
+.B \-\-list\-players
+List MPRIS players and exit.
+.SS What to show
+.TP
+.B \-\-no\-header
+Hide the header.
+.TP
+.B \-\-no\-artist
+Show only the title in the header.
+.TP
+.B \-\-no\-source
+Hide the player name in the header.
+.TP
+.B \-\-no\-missing
+Hide the "missing in font" hint (block renderer).
+.TP
+.B \-\-clean
+Same as \fB\-\-no\-artist \-\-no\-source \-\-no\-missing\fR.
+.TP
+.B \-\-prev
+Show the previous line above, dimmed.
+.TP
+.B \-\-next
+Show the next line below, dimmed.
+.TP
+.BI \-\-mode " line|word"
+Show whole lines, or one word at a time.
+.SS Files
+.TP
+.BI \-\-export " PATH"
+Write the current line to PATH. The file is replaced atomically.
+.TP
+.BI \-\-save\-lrc " DIR"
+Save every .lrc file that was found into DIR.
+.SS Rendering
+.TP
+.BI \-\-renderer " block|kitty"
+Block font in any terminal, or an image in kitty.
+.TP
+.B \-\-no\-bold
+No bold weight (block renderer).
+.TP
+.BI \-\-style " bold|mono|soft"
+Font style for the kitty renderer.
+.TP
+.BI \-\-font " PATH"
+Custom TrueType font for the kitty renderer.
+.TP
+.BI \-\-font\-size " N"
+Font size in pixels for the kitty renderer. Default: 56.
+.TP
+.BI \-\-spacing " N"
+Letter spacing in pixels for the kitty renderer.
+.TP
+.B \-\-glow \fR/\fB \-\-no\-glow
+Enable or disable the glow effect (kitty renderer).
+.SH KEYS
+.TP
+.B + / \-
+Shift the sync by 0.1 s.
+.TP
+.B 0
+Reset the sync shift.
+.TP
+.B v
+Switch to the next synced version of the current track, if lrclib has one.
+.TP
+.B q
+Quit.
+.SH FILES
+.TP
+.I ~/.cache/lyrics-term/
+Cache of lyrics lookups. A failed network request is not cached; a track without
+synced lyrics is cached as empty.
+.SH ENVIRONMENT
+.TP
+.B XDG_CACHE_HOME
+Used instead of ~/.cache when set.
+.SH NOTES
+Synchronization depends on the player reporting its Position over MPRIS.
+.SH SEE ALSO
+.BR kitty (1),
+.BR mpris-proxy (1)
+.SH LICENSE
+MIT.

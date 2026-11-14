@@ -1,11 +1,13 @@
 #pragma once
-// Lyrics: lookup on lrclib.net, disk cache, .lrc saving, LRC parsing.
+#include "paths.hpp"
+// Lyrics: lookup on lrclib.net, disk cache, .lrc saving, LRC parsing, version candidates.
 
 #include <curl/curl.h>
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
 #include <cctype>
+#include <chrono>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -13,6 +15,7 @@
 #include <sstream>
 #include <string>
 #include <system_error>
+#include <thread>
 #include <vector>
 
 struct LyricLine {
@@ -35,23 +38,17 @@ inline std::string trim(const std::string& s) {
     return s.substr(b, e - b + 1);
 }
 
-// nullopt: network error (not cached). Empty string: no synced lyrics. Otherwise: syncedLyrics
-inline std::optional<std::string> fetch_synced(const std::string& artist, const std::string& title) {
+// Performs one GET request. Returns {HTTP code, body}, or nullopt on a transport error
+inline std::optional<std::pair<long, std::string>> http_get(const std::string& url) {
     CURL* curl = curl_easy_init();
     if (!curl) return std::nullopt;
-
-    char* a = curl_easy_escape(curl, artist.c_str(), static_cast<int>(artist.size()));
-    char* t = curl_easy_escape(curl, title.c_str(), static_cast<int>(title.size()));
-    std::string url = std::string("https://lrclib.net/api/get?artist_name=") + a + "&track_name=" + t;
-    curl_free(a);
-    curl_free(t);
 
     std::string body;
     curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_cb);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &body);
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, 5L);
-    curl_easy_setopt(curl, CURLOPT_USERAGENT, "lyrics-term/1.0");
+    curl_easy_setopt(curl, CURLOPT_USERAGENT, "lyrics-term/2.0.0");
 
     CURLcode rc = curl_easy_perform(curl);
     long code = 0;
@@ -59,11 +56,30 @@ inline std::optional<std::string> fetch_synced(const std::string& artist, const 
     curl_easy_cleanup(curl);
 
     if (rc != CURLE_OK) return std::nullopt;
-    if (code == 404) return std::string();
-    if (code != 200) return std::nullopt;
+    return std::make_pair(code, body);
+}
+
+// URL-encodes a value for a query string
+inline std::string escape(const std::string& value) {
+    CURL* curl = curl_easy_init();
+    if (!curl) return value;
+    char* e = curl_easy_escape(curl, value.c_str(), static_cast<int>(value.size()));
+    std::string out = e ? e : value;
+    curl_free(e);
+    curl_easy_cleanup(curl);
+    return out;
+}
+
+// nullopt: network error (not cached). Empty string: no synced lyrics. Otherwise: syncedLyrics
+inline std::optional<std::string> fetch_synced(const std::string& artist, const std::string& title) {
+    std::string url = "https://lrclib.net/api/get?artist_name=" + escape(artist) + "&track_name=" + escape(title);
+    auto res = http_get(url);
+    if (!res) return std::nullopt;
+    if (res->first == 404) return std::string();
+    if (res->first != 200) return std::nullopt;
 
     try {
-        auto j = nlohmann::json::parse(body);
+        auto j = nlohmann::json::parse(res->second);
         if (j.contains("syncedLyrics") && j["syncedLyrics"].is_string())
             return j["syncedLyrics"].get<std::string>();
     } catch (...) {
@@ -73,14 +89,9 @@ inline std::optional<std::string> fetch_synced(const std::string& artist, const 
 
 // ~/.cache/lyrics-term (or $XDG_CACHE_HOME/lyrics-term)
 inline std::filesystem::path cache_dir() {
-    namespace fs = std::filesystem;
-    fs::path base;
-    if (const char* xdg = std::getenv("XDG_CACHE_HOME"); xdg && *xdg) base = xdg;
-    else if (const char* home = std::getenv("HOME")) base = fs::path(home) / ".cache";
-    else base = ".cache";
-    fs::path dir = base / "lyrics-term";
+    std::filesystem::path dir = std::filesystem::path(cache_root()) / "lyrics-term";
     std::error_code ec;
-    fs::create_directories(dir, ec);
+    std::filesystem::create_directories(dir, ec);
     return dir;
 }
 
@@ -113,6 +124,54 @@ inline std::optional<std::string> load_synced(const std::string& artist, const s
         out << *fetched;
     }
     return fetched;
+}
+
+// Finds a local .lrc for a track: "Artist - Title.lrc" in the folder first, then any .lrc in the
+// folder tree whose file name contains both the artist and the title (case-insensitive).
+// Returns an empty string if nothing matches
+inline std::string find_local_lrc(const std::string& dir, const std::string& artist, const std::string& title) {
+    namespace fs = std::filesystem;
+    std::error_code ec;
+    if (dir.empty() || (artist.empty() && title.empty()) || !fs::is_directory(dir, ec)) return {};
+
+    fs::path exact = fs::path(dir) / (safe_name(artist + " - " + title) + ".lrc");
+    if (fs::exists(exact, ec)) return exact.string();
+
+    auto lower = [](std::string s) {
+        for (auto& c : s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        return s;
+    };
+    const std::string a = lower(artist), t = lower(title);
+
+    fs::recursive_directory_iterator it(dir, fs::directory_options::skip_permission_denied, ec);
+    fs::recursive_directory_iterator end;
+    for (; !ec && it != end; it.increment(ec)) {
+        const fs::path& p = it->path();
+        if (p.extension() != ".lrc" || !it->is_regular_file(ec)) continue;
+        std::string name = lower(p.filename().string());
+        if ((a.empty() || name.find(a) != std::string::npos) && (t.empty() || name.find(t) != std::string::npos))
+            return p.string();
+    }
+    return {};
+}
+
+// Lookup order for one track:
+//   auto:   local folder, then cache, then lrclib
+//   local:  local folder only
+//   lrclib: cache and lrclib, folder skipped
+inline std::optional<std::string> load_track(const std::string& artist, const std::string& title,
+                                             const std::string& backend, const std::string& lyrics_dir) {
+    if (backend == "auto" || backend == "local") {
+        std::string path = find_local_lrc(lyrics_dir, artist, title);
+        if (!path.empty()) {
+            std::ifstream in(path, std::ios::binary);
+            std::ostringstream ss;
+            ss << in.rdbuf();
+            if (!ss.str().empty()) return ss.str();
+        }
+        if (backend == "local") return std::string();
+    }
+    return load_synced(artist, title);
 }
 
 // Saves a found synced text into a directory (used by --save-lrc)
@@ -183,6 +242,41 @@ inline std::vector<LyricLine> build_units(const std::vector<LyricLine>& lines, b
     std::stable_sort(out.begin(), out.end(),
                      [](const LyricLine& a, const LyricLine& b) { return a.time < b.time; });
     return out;
+}
+
+// Extracts distinct non-empty syncedLyrics values from a /api/search response body.
+// Invalid JSON or a non-array body gives an empty result. No network access here, so it is testable
+inline std::vector<std::string> parse_candidates_json(const std::string& body) {
+    std::vector<std::string> out;
+    try {
+        auto j = nlohmann::json::parse(body);
+        if (!j.is_array()) return out;
+        for (const auto& item : j) {
+            if (!item.contains("syncedLyrics") || !item["syncedLyrics"].is_string()) continue;
+            std::string s = item["syncedLyrics"].get<std::string>();
+            if (!s.empty() && std::find(out.begin(), out.end(), s) == out.end()) out.push_back(s);
+        }
+    } catch (...) {
+        out.clear();
+    }
+    return out;
+}
+
+// All distinct synced versions lrclib knows for a track (used by the 'v' key).
+// Retries transient failures (transport errors and HTTP 5xx) up to three times.
+// nullopt: every attempt failed. Empty vector: the request worked and no synced version exists
+inline std::optional<std::vector<std::string>> fetch_candidates(const std::string& artist,
+                                                                const std::string& title) {
+    std::string url = "https://lrclib.net/api/search?artist_name=" + escape(artist) +
+                      "&track_name=" + escape(title);
+    constexpr int kAttempts = 3;
+    for (int attempt = 1; attempt <= kAttempts; ++attempt) {
+        auto res = http_get(url);
+        if (res && res->first == 200) return parse_candidates_json(res->second);
+        if (res && res->first >= 400 && res->first < 500) return std::nullopt;  // no point retrying
+        if (attempt < kAttempts) std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    }
+    return std::nullopt;
 }
 
 }  // namespace lyrics

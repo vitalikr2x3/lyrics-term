@@ -1,36 +1,46 @@
-#pragma once
-// Non-blocking key input. The terminal is switched to raw mode without echo.
-// Ctrl+C still works because ISIG stays enabled.
+// Terminal for Linux and macOS: termios, select and the window size ioctl.
+#include "platform.hpp"
 
+#include <sys/ioctl.h>
 #include <sys/select.h>
 #include <termios.h>
 #include <unistd.h>
 
-namespace input {
+namespace {
+termios g_orig{};
+bool g_active = false;
+}
 
-inline termios g_orig{};
-inline bool g_active = false;
+TermSize term_size() {
+    TermSize t;
+    winsize ws{};
+    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == 0) {
+        if (ws.ws_col) t.cols = ws.ws_col;
+        if (ws.ws_row) t.rows = ws.ws_row;
+        if (ws.ws_xpixel && ws.ws_col) t.cell_w = ws.ws_xpixel / ws.ws_col;
+        if (ws.ws_ypixel && ws.ws_row) t.cell_h = ws.ws_ypixel / ws.ws_row;
+    }
+    return t;
+}
 
-inline void enable_raw() {
+void enable_terminal() {
     if (!isatty(STDIN_FILENO)) return;
     if (tcgetattr(STDIN_FILENO, &g_orig) != 0) return;
     termios raw = g_orig;
-    raw.c_lflag &= ~(ICANON | ECHO);
+    raw.c_lflag &= ~(ICANON | ECHO);  // ISIG stays on, so Ctrl+C still works
     raw.c_cc[VMIN] = 0;
     raw.c_cc[VTIME] = 0;
     if (tcsetattr(STDIN_FILENO, TCSANOW, &raw) == 0) g_active = true;
 }
 
-// Called both on exit and from the signal handler (tcsetattr is async-signal-safe)
-inline void restore() {
+void restore_terminal() {
     if (g_active) {
         tcsetattr(STDIN_FILENO, TCSANOW, &g_orig);
         g_active = false;
     }
 }
 
-// Returns a pressed key, or 0 if nothing is waiting
-inline char poll_key() {
+int poll_key() {
     if (!g_active) return 0;
     fd_set set;
     FD_ZERO(&set);
@@ -42,5 +52,3 @@ inline char poll_key() {
     }
     return 0;
 }
-
-}  // namespace input

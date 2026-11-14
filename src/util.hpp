@@ -1,8 +1,12 @@
 #pragma once
 // Shared helpers: UTF-8 handling, case folding, colors, terminal size, kitty palette.
 
-#include <sys/ioctl.h>
-#include <unistd.h>
+#include "platform.hpp"
+#ifdef _WIN32
+#include <cstdio>
+#define popen _popen
+#define pclose _pclose
+#endif
 
 #include <algorithm>
 #include <cctype>
@@ -129,21 +133,10 @@ inline bool in_kitty() {
     return term && std::string(term) == "xterm-kitty";
 }
 
-struct TermSize {
-    int cols = 80, rows = 24;
-    int cell_w = 10, cell_h = 20;  // cell size in pixels, used when the terminal does not report it
-};
+using TermSize = ::TermSize;
 
 inline TermSize term_size() {
-    TermSize t;
-    winsize ws{};
-    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == 0) {
-        if (ws.ws_col) t.cols = ws.ws_col;
-        if (ws.ws_row) t.rows = ws.ws_row;
-        if (ws.ws_xpixel && ws.ws_col) t.cell_w = ws.ws_xpixel / ws.ws_col;
-        if (ws.ws_ypixel && ws.ws_row) t.cell_h = ws.ws_ypixel / ws.ws_row;
-    }
-    return t;
+    return ::term_size();
 }
 
 // HSV to RGB. h in degrees, s and v in 0..1 (used by --rainbow)

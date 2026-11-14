@@ -38,8 +38,8 @@ public:
     Renderer(const Renderer&) = delete;
     Renderer& operator=(const Renderer&) = delete;
 
-    // dim: lower the opacity of the text (used while paused)
-    Image render(const std::string& text, int max_w, util::Rgb rgb, bool dim) {
+    // opacity: 0..1 multiplier for the text (dimming while paused, fade-in)
+    Image render(const std::string& text, int max_w, util::Rgb rgb, float opacity) {
         std::u32string up;
         for (char32_t c : util::decode_utf8(text)) up += util::to_upper(c);
         auto lines = wrap(up, max_w);
@@ -84,8 +84,8 @@ public:
                 final_alpha[i] = std::max(alpha[i], hv);
             }
         }
-        if (dim)
-            for (auto& a : final_alpha) a = static_cast<uint8_t>(a * 0.45);
+        if (opacity < 1.0f)
+            for (auto& a : final_alpha) a = static_cast<uint8_t>(a * opacity);
 
         Image img;
         img.w = w;
@@ -199,7 +199,7 @@ inline std::string base64(const std::vector<uint8_t>& in) {
 }
 
 // kitty graphics protocol: raw RGBA, base64 in 4096-byte chunks
-inline std::string image_sequence(const Image& img) {
+inline std::string image_sequence(const Image& img, uint32_t id) {
     std::string b64 = base64(img.rgba);
     std::string out;
     size_t pos = 0;
@@ -209,7 +209,8 @@ inline std::string image_sequence(const Image& img) {
         bool more = pos + n < b64.size();
         out += "\x1b_G";
         if (first)
-            out += "a=T,f=32,s=" + std::to_string(img.w) + ",v=" + std::to_string(img.h) + ",q=2,";
+            out += "a=T,f=32,s=" + std::to_string(img.w) + ",v=" + std::to_string(img.h) +
+                   ",i=" + std::to_string(id) + ",q=2,";
         out += std::string("m=") + (more ? "1" : "0") + ";";
         out.append(b64, pos, n);
         out += "\x1b\\";
@@ -221,11 +222,11 @@ inline std::string image_sequence(const Image& img) {
 
 // Draws the header, the previous line, the image of the current line, a hint and the next line
 inline void draw(Renderer& r, const std::string& text, const std::string& header, const std::string& note,
-                 const std::string& prev, const std::string& next, util::Rgb rgb, bool dim, bool left) {
+                 const std::string& prev, const std::string& next, util::Rgb rgb, float opacity, bool left) {
     util::TermSize t = util::term_size();
 
     Image img;
-    if (!text.empty()) img = r.render(text, t.cols * t.cell_w, rgb, dim);
+    if (!text.empty()) img = r.render(text, t.cols * t.cell_w, rgb, opacity);
     int img_rows = img.w ? (img.h + t.cell_h - 1) / t.cell_h : 0;
     int img_cols = img.w ? (img.w + t.cell_w - 1) / t.cell_w : 0;
 
@@ -239,8 +240,17 @@ inline void draw(Renderer& r, const std::string& text, const std::string& header
     auto col_for = [&](int width) { return left ? 2 : std::max(0, (t.cols - width) / 2); };
     auto cw = [](const std::string& s) { return static_cast<int>(util::codepoints(s)); };
 
-    // Delete old kitty images, then clear the screen
-    std::string out = "\x1b_Ga=d,d=a,q=2\x1b\\\033[2J\033[H";
+    // Erase the screen line by line instead of a full clear, so frames do not blink.
+    // The new image gets its own id and the previous one is deleted after it is shown.
+    static uint32_t last_id = 0;
+    static bool started = false;
+    std::string out;
+    if (!started) {
+        out += "\x1b_Ga=d,d=a,q=2\x1b\\";  // first draw: remove leftovers from an earlier run
+        started = true;
+    }
+    for (int r = 0; r < t.rows; ++r) out += at(r, 0) + "\033[2K";
+    uint32_t id = last_id == 1 ? 2 : 1;
     int row = top;
     if (!header.empty()) {
         out += at(row, col_for(cw(header))) + "\033[2m" + header + "\033[0m";
@@ -251,7 +261,7 @@ inline void draw(Renderer& r, const std::string& text, const std::string& header
         row += 2;
     }
     if (img.w) {
-        out += at(row, col_for(img_cols)) + image_sequence(img);
+        out += at(row, col_for(img_cols)) + image_sequence(img, id);
         row += img_rows;
     }
     if (!note.empty()) {
@@ -259,6 +269,15 @@ inline void draw(Renderer& r, const std::string& text, const std::string& header
         row += 1;
     }
     if (!next.empty()) out += at(row + 1, col_for(cw(next))) + "\033[2m" + next + "\033[0m";
+
+    // The new image is already placed: now remove the previous one (or the last one if there is no text)
+    if (img.w) {
+        if (last_id && last_id != id) out += "\x1b_Ga=d,d=i,i=" + std::to_string(last_id) + ",q=2\x1b\\";
+        last_id = id;
+    } else if (last_id) {
+        out += "\x1b_Ga=d,d=i,i=" + std::to_string(last_id) + ",q=2\x1b\\";
+        last_id = 0;
+    }
 
     std::fwrite(out.data(), 1, out.size(), stdout);
     std::fflush(stdout);

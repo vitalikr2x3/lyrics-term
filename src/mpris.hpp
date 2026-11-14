@@ -10,15 +10,9 @@
 #include <string>
 #include <vector>
 
+#include "platform.hpp"
 #include "util.hpp"
 
-struct PlayerInfo {
-    std::string name;     // short name: spotify, mpv, audacious
-    std::string artist;
-    std::string title;
-    std::string status;   // Playing / Paused / Stopped
-    double position = 0;  // seconds
-};
 
 class Mpris {
 public:
