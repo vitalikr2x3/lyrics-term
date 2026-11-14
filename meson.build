@@ -1,5 +1,5 @@
 project('lyrics-term', 'cpp',
-  version : '3.0.1',
+  version : '3.0.2',
   default_options : [
     'cpp_std=gnu++17',  # popen/pclose and POSIX calls need the GNU extensions on Linux and macOS
     'warning_level=3',
@@ -25,14 +25,11 @@ host = host_machine.system()
 if host == 'linux'
   player_src = ['src/platform_posix.cpp', 'src/player_linux.cpp']
   player_deps = [dependency('dbus-1')]
-elif host == 'darwin'
-  player_src = ['src/platform_posix.cpp', 'src/player_macos.cpp']
-  player_deps = []
 elif host == 'windows'
   player_src = ['src/platform_windows.cpp', 'src/player_windows.cpp']
   player_deps = [meson.get_compiler('cpp').find_library('windowsapp')]
 else
-  error('unsupported platform: ' + host)
+  error('unsupported platform: ' + host + ' (supported: linux, windows)')
 endif
 
 executable(

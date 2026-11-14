@@ -1,7 +1,7 @@
 #pragma once
 // Platform layer: the only code that differs between Linux, macOS and Windows.
-// Implementations: platform_posix.cpp (terminal, Linux and macOS), platform_windows.cpp (terminal, Windows),
-// player_linux.cpp (MPRIS), player_macos.cpp (AppleScript), player_windows.cpp (SMTC).
+// Implementations: platform_posix.cpp (terminal, Linux), platform_windows.cpp (terminal, Windows),
+// player_linux.cpp (MPRIS), player_windows.cpp (SMTC).
 
 #include <optional>
 #include <string>

@@ -1,13 +1,13 @@
 ## 3.0.0
 
-- Three platforms from one codebase: Linux (MPRIS over D-Bus), macOS (Spotify and Music through AppleScript),
-  Windows (System Media Transport Controls).
+- Two platforms from one codebase: Linux (MPRIS over D-Bus) and Windows (System Media Transport Controls).
+  macOS is not supported.
 - Platform code is isolated in `platform.hpp` and the `platform_*.cpp` / `player_*.cpp` files; `main.cpp` no longer
   includes termios, D-Bus or unistd headers.
 - Windows terminal: ANSI output through the Console API, keys through `_kbhit`/`_getch`.
-- Cache and home folders follow each system: `~/.cache` (Linux), `~/Library/Caches` (macOS), `%LOCALAPPDATA%` (Windows).
-- The kitty renderer and `--from-kitty` are available on Linux and macOS only; on Windows the block renderer is used.
-- Status: the Linux build is the 2.1.0 code, moved into the new layout. macOS and Windows are not compiled or tested yet.
+- Cache and home folders follow each system: `~/.cache` (Linux), `%LOCALAPPDATA%` (Windows).
+- The kitty renderer and `--from-kitty` are available on Linux only; on Windows the block renderer is used.
+- Status: Linux is the 2.1.0 code in the new layout. Windows is not compiled or tested yet.
 
 # Changelog
 
