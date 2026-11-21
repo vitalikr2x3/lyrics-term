@@ -2,7 +2,9 @@
 // Written against C++/WinRT; the method names are checked only on a real Windows build.
 #include "platform.hpp"
 
+#include <winrt/base.h>
 #include <winrt/Windows.Foundation.h>
+#include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/Windows.Media.Control.h>
 
 #include <algorithm>

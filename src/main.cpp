@@ -21,6 +21,7 @@
 #include <vector>
 
 #include "block.hpp"
+#include "config.hpp"
 #include "paths.hpp"
 #include "platform.hpp"
 #include <filesystem>
@@ -153,6 +154,8 @@ Options parse_args(int argc, char** argv) {
         else if (a == "--dim-paused") o.dim_paused = true;
         else if (a == "--fade") o.fade = true;
         else if (a == "--headless") o.headless = true;
+    else if (a == "--config") (void)need();  // handled before parsing, see config::merged_args
+    else if (a == "--no-config") {}
         else if (a == "--backend") {
             o.backend = need();
             if (o.backend != "auto" && o.backend != "local" && o.backend != "lrclib")
@@ -244,7 +247,17 @@ std::string fmt_offset(double v) {
 
 int main(int argc, char** argv) {
     try {
-        Options o = parse_args(argc, argv);
+        std::vector<std::string> merged;
+    try {
+        merged = config::merged_args(argc, argv);
+    } catch (const std::exception& e) {
+        std::fprintf(stderr, "error: %s\n", e.what());
+        return 1;
+    }
+    std::vector<char*> merged_argv;
+    for (auto& s : merged) merged_argv.push_back(s.data());
+    merged_argv.push_back(nullptr);
+    Options o = parse_args(static_cast<int>(merged.size()), merged_argv.data());
         util::g_vpos = std::clamp(o.vpos, 0, 100);
         if (o.lyrics_dir.empty()) {
             const std::string home = home_dir();

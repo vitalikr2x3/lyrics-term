@@ -28,3 +28,17 @@ bool file_readable(const std::string& path) {
     std::ifstream f(path);
     return f.good();
 }
+
+std::string config_dir() {
+#ifdef _WIN32
+    if (const char* appdata = std::getenv("APPDATA"); appdata && *appdata) {
+        return std::string(appdata) + "/lyrics-term";
+    }
+    return home_dir() + "/AppData/Roaming/lyrics-term";
+#else
+    if (const char* xdg = std::getenv("XDG_CONFIG_HOME"); xdg && *xdg) {
+        return std::string(xdg) + "/lyrics-term";
+    }
+    return home_dir() + "/.config/lyrics-term";
+#endif
+}

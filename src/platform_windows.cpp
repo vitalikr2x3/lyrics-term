@@ -21,6 +21,9 @@ TermSize term_size() {
 }
 
 void enable_terminal() {
+    // Block characters are UTF-8; without this the default console code page prints them as garbage
+    SetConsoleOutputCP(CP_UTF8);
+    SetConsoleCP(CP_UTF8);
     // Virtual terminal processing: ANSI escape sequences work in Windows 10 (1511) and newer
     HANDLE out = GetStdHandle(STD_OUTPUT_HANDLE);
     DWORD mode = 0;

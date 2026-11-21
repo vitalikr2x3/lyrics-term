@@ -1,3 +1,26 @@
+## 3.1.4
+
+- Build: ckdl is built through a Meson file in `subprojects/packagefiles/ckdl` (Meson wrap `patch_directory`).
+
+## 3.1.3
+
+- Build: ckdl is compiled from its C sources by Meson; CMake is no longer needed.
+
+## 3.1.2
+
+- Build: C++17 is requested as `c++17` (not `gnu++17`), so a clean Windows setup works with MSVC.
+
+## 3.1.1
+
+- Block font: added ( ) : ; " & / + * % = _ so titles and lyrics with these characters are drawn
+  instead of showing "missing in font".
+
+## 3.1.0
+
+- Config file `config.kdl` (KDL): `~/.config/lyrics-term/config.kdl` on Linux, `%APPDATA%\lyrics-term\config.kdl` on Windows.
+  Every command-line option works in the file; the command line overrides it. Use `--config PATH` or `--no-config`.
+- KDL parsing uses ckdl (built from `subprojects/ckdl` with CMake).
+
 ## 3.0.0
 
 - Two platforms from one codebase: Linux (MPRIS over D-Bus) and Windows (System Media Transport Controls).

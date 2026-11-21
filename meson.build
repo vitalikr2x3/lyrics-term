@@ -1,7 +1,7 @@
-project('lyrics-term', 'cpp',
-  version : '3.0.2',
+project('lyrics-term', ['c', 'cpp'],
+  version : '3.1.4',
   default_options : [
-    'cpp_std=gnu++17',  # popen/pclose and POSIX calls need the GNU extensions on Linux and macOS
+    'cpp_std=c++17',
     'warning_level=3',
     'buildtype=release',
   ],
@@ -18,6 +18,11 @@ if not json_dep.found()
   endif
   json_dep = declare_dependency()
 endif
+
+# ckdl (KDL parser): built by subprojects/packagefiles/ckdl/meson.build through the wrap file
+ckdl_sub = subproject('ckdl')
+ckdl_dep = ckdl_sub.get_variable('ckdl_dep')
+add_project_arguments('-DKDL_STATIC_LIB', language : 'cpp')
 threads_dep  = dependency('threads')
 
 # One source set per platform: the player and the terminal
@@ -28,14 +33,16 @@ if host == 'linux'
 elif host == 'windows'
   player_src = ['src/platform_windows.cpp', 'src/player_windows.cpp']
   player_deps = [meson.get_compiler('cpp').find_library('windowsapp')]
+  # windows.h defines min/max macros, which break std::min and std::max
+  add_project_arguments(['-DNOMINMAX', '-D_CRT_SECURE_NO_WARNINGS'], language : 'cpp')
 else
   error('unsupported platform: ' + host + ' (supported: linux, windows)')
 endif
 
 executable(
   'lyrics-term',
-  ['src/main.cpp', 'src/paths.cpp'] + player_src,
-  dependencies : [curl_dep, freetype_dep, json_dep, threads_dep] + player_deps,
+  ['src/main.cpp', 'src/paths.cpp', 'src/config.cpp'] + player_src,
+  dependencies : [curl_dep, freetype_dep, json_dep, threads_dep, ckdl_dep] + player_deps,
   install : true,
 )
 

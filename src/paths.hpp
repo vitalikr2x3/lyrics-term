@@ -7,3 +7,6 @@ std::string home_dir();
 std::string cache_root();
 // True if the file can be opened for reading
 bool file_readable(const std::string& path);
+
+// Folder for config.kdl: %APPDATA%\lyrics-term on Windows, $XDG_CONFIG_HOME/lyrics-term or ~/.config/lyrics-term on Linux
+std::string config_dir();

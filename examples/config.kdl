@@ -1,0 +1,23 @@
+// ~/.config/lyrics-term/config.kdl (Windows: %APPDATA%\lyrics-term\config.kdl)
+// Every option of the command line works here. The command line overrides this file.
+
+player "spotify"
+backend "auto"
+lyrics-dir "~/Lyrics"
+clean #true
+
+display {
+    color "#00ffcc"
+    renderer "auto"
+    mode "line"
+    align "center"
+    vpos 50
+    next #true
+}
+
+kitty {
+    style "soft"
+    from-kitty "color2"
+    fade #true
+    font-size 56
+}
