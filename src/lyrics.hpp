@@ -3,6 +3,9 @@
 // Lyrics: lookup on lrclib.net, disk cache, .lrc saving, LRC parsing, version candidates.
 
 #include <curl/curl.h>
+#ifdef LT_SPICY
+#include "spicy.hpp"
+#endif
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
@@ -159,7 +162,7 @@ inline std::string find_local_lrc(const std::string& dir, const std::string& art
 //   auto:   local folder, then cache, then lrclib
 //   local:  local folder only
 //   lrclib: cache and lrclib, folder skipped
-inline std::optional<std::string> load_track(const std::string& artist, const std::string& title,
+inline std::optional<std::string> load_track_base(const std::string& artist, const std::string& title,
                                              const std::string& backend, const std::string& lyrics_dir) {
     if (backend == "auto" || backend == "local") {
         std::string path = find_local_lrc(lyrics_dir, artist, title);
@@ -277,6 +280,24 @@ inline std::optional<std::vector<std::string>> fetch_candidates(const std::strin
         if (attempt < kAttempts) std::this_thread::sleep_for(std::chrono::milliseconds(500));
     }
     return std::nullopt;
+}
+
+// Lyrics for one track. Private builds (-Dspicy=true) try Spicy Lyrics first for players that report a Spotify
+// track id, unless a local .lrc file exists. Spicy text is not cached (its terms allow 30 days at most)
+inline std::optional<std::string> load_track(const std::string& artist, const std::string& title,
+                                             const std::string& backend, const std::string& lyrics_dir,
+                                             const std::string& track_id = "") {
+#ifdef LT_SPICY
+    spicy::set_attribution("");
+    if ((backend == "auto" || backend == "spicy") && !track_id.empty() && find_local_lrc(lyrics_dir, artist, title).empty()) {
+        if (auto r = spicy::fetch(track_id)) {
+            spicy::set_attribution(r->attribution);
+            return r->lrc;
+        }
+    }
+    if (backend == "spicy") return std::string();  // Spicy only: nothing else to try
+#endif
+    return load_track_base(artist, title, backend, lyrics_dir);
 }
 
 }  // namespace lyrics

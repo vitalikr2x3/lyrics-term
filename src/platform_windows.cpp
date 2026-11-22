@@ -2,6 +2,8 @@
 // keys are read with _kbhit/_getch.
 #include "platform.hpp"
 
+#include <cstdio>
+
 #include <conio.h>
 #include <windows.h>
 
@@ -28,10 +30,16 @@ void enable_terminal() {
     HANDLE out = GetStdHandle(STD_OUTPUT_HANDLE);
     DWORD mode = 0;
     if (GetConsoleMode(out, &mode)) SetConsoleMode(out, mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
+    // Alternate screen: the frame is drawn in its own buffer, so the scrollback is not touched
+    std::fputs("\x1b[?1049h\x1b[?25l\x1b[2J\x1b[H", stdout);
+    std::fflush(stdout);
     g_active = true;
 }
 
 void restore_terminal() {
+    if (!g_active) return;
+    std::fputs("\x1b[?25h\x1b[?1049l", stdout);
+    std::fflush(stdout);
     g_active = false;
 }
 

@@ -1,0 +1,62 @@
+name: release binaries
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: arch
+            image: archlinux:latest
+          - name: fedora
+            image: fedora:latest
+          - name: debian
+            image: debian:stable
+    runs-on: ubuntu-latest
+    container: ${{ matrix.image }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: deps (arch)
+        if: matrix.name == 'arch'
+        run: pacman -Syu --noconfirm base-devel git meson ninja pkgconf curl freetype2 nlohmann-json dbus
+      - name: deps (fedora)
+        if: matrix.name == 'fedora'
+        run: dnf install -y gcc-c++ git meson ninja-build pkgconf-pkg-config libcurl-devel freetype-devel json-devel dbus-devel
+      - name: deps (debian)
+        if: matrix.name == 'debian'
+        run: |
+          apt-get update
+          apt-get install -y build-essential git meson ninja-build pkg-config libcurl4-openssl-dev libfreetype-dev nlohmann-json3-dev libdbus-1-dev
+      - name: build
+        run: |
+          meson setup build --buildtype=release ${{ env.MESON_EXTRA }}
+          meson compile -C build
+      - name: package
+        run: |
+          mkdir dist
+          cp build/lyrics-term dist/
+          cp examples/config.kdl README.md LICENSE dist/
+          tar -C dist -czf lyrics-term-${{ matrix.name }}-x86_64.tar.gz .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lyrics-term-${{ matrix.name }}
+          path: lyrics-term-${{ matrix.name }}-x86_64.tar.gz
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.tar.gz

@@ -1,5 +1,5 @@
 project('lyrics-term', ['c', 'cpp'],
-  version : '3.1.4',
+  version : '3.1.14',
   default_options : [
     'cpp_std=c++17',
     'warning_level=3',
@@ -39,9 +39,15 @@ else
   error('unsupported platform: ' + host + ' (supported: linux, windows)')
 endif
 
+spicy_src = []
+if get_option('spicy')
+  spicy_src = ['src/spicy.cpp']
+  add_project_arguments('-DLT_SPICY=1', language : 'cpp')
+endif
+
 executable(
   'lyrics-term',
-  ['src/main.cpp', 'src/paths.cpp', 'src/config.cpp'] + player_src,
+  ['src/main.cpp', 'src/paths.cpp', 'src/config.cpp'] + player_src + spicy_src,
   dependencies : [curl_dep, freetype_dep, json_dep, threads_dep, ckdl_dep] + player_deps,
   install : true,
 )

@@ -1,6 +1,8 @@
 // Terminal for Linux and macOS: termios, select and the window size ioctl.
 #include "platform.hpp"
 
+#include <cstdio>
+
 #include <sys/ioctl.h>
 #include <sys/select.h>
 #include <termios.h>
@@ -30,12 +32,18 @@ void enable_terminal() {
     raw.c_lflag &= ~(ICANON | ECHO);  // ISIG stays on, so Ctrl+C still works
     raw.c_cc[VMIN] = 0;
     raw.c_cc[VTIME] = 0;
-    if (tcsetattr(STDIN_FILENO, TCSANOW, &raw) == 0) g_active = true;
+    if (tcsetattr(STDIN_FILENO, TCSANOW, &raw) == 0) {
+        g_active = true;
+        std::fputs("\x1b[?1049h\x1b[?25l\x1b[2J\x1b[H", stdout);
+        std::fflush(stdout);
+    }
 }
 
 void restore_terminal() {
     if (g_active) {
         tcsetattr(STDIN_FILENO, TCSANOW, &g_orig);
+        std::fputs("\x1b[?25h\x1b[?1049l", stdout);
+        std::fflush(stdout);
         g_active = false;
     }
 }

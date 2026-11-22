@@ -1,3 +1,53 @@
+## 3.1.14
+
+- `--backend spicy` (private builds only): lyrics only from Spicy Lyrics. The public build rejects it.
+
+## 3.1.13
+
+- Private build option `-Dspicy=true`: Spicy Lyrics as a lyrics source (syllable sync turned into lines),
+  needs `SPICY_LYRICS_SECRET_KEY`. Attribution is shown in the header. The default build does not contain this code.
+- Player info carries the Spotify track id (MPRIS `xesam:url`), used by the Spicy source.
+
+## 3.1.12
+
+- Header symbol: `♪` by default instead of the 🎵 emoji. `--icon TEXT` sets another symbol,
+  `--icon ""` hides it.
+
+## 3.1.11
+
+- `--glyph-size N` (6..16, default 8): rows per glyph in the 8x8 mode, so the TrueType glyphs can be drawn
+  larger and more readable (for example `--glyph-size 10`).
+
+## 3.1.10
+
+- Block font 8x8: `--glyphs 8x8` draws letters rasterized from a TrueType font (default: Consolas or
+  Courier New on Windows, DejaVu Sans Mono on Linux; or `--font PATH`). Each pixel is two cells wide.
+
+## 3.1.9
+
+- Block font size: `--scale 1..4` (default 1). Each pixel becomes a square of N x N cells;
+  wrapping takes the scale into account. Works in config.kdl as `scale 2`.
+
+## 3.1.8
+
+- Block renderer clears the screen before each frame, so old lines disappear when the track ends
+  or the lyrics are empty.
+
+## 3.1.7
+
+- Block renderer places every line by its absolute row (ESC[row;1H) instead of printing newlines,
+  so frames no longer drift or duplicate in Windows consoles.
+
+## 3.1.6
+
+- Terminal: the program runs in the alternate screen buffer (like vim or less). The terminal's scrollback
+  no longer shows old frames; the original screen comes back on exit. Headless mode is not affected.
+
+## 3.1.5
+
+- Block renderer redraws in place: the cursor goes home instead of clearing the screen with ESC[2J,
+  so the terminal no longer scrolls on every update (visible on Windows Terminal).
+
 ## 3.1.4
 
 - Build: ckdl is built through a Meson file in `subprojects/packagefiles/ckdl` (Meson wrap `patch_directory`).

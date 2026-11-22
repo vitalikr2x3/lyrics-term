@@ -1,1 +1,2 @@
 option('tests', type : 'boolean', value : false, description : 'Build the unit tests')
+option('spicy', type : 'boolean', value : false, description : 'Spicy Lyrics source: private builds only, see the service terms')

@@ -22,6 +22,10 @@
 
 #include "block.hpp"
 #include "config.hpp"
+#include "glyphs8.hpp"
+#ifdef LT_SPICY
+#include "spicy.hpp"
+#endif
 #include "paths.hpp"
 #include "platform.hpp"
 #include <filesystem>
@@ -53,6 +57,10 @@ struct Options {
     std::string backend = "auto";  // auto | local | lrclib
     std::string lyrics_dir;         // folder with .lrc files; default: ~/Lyrics  // draw nothing; only write the --export file (for Quickshell and bars)
     int vpos = 50;
+    int scale = 1;  // block font: size of one pixel in cells (1..4)
+    std::string glyphs = "5x5";  // block font: 5x5 (built in) or 8x8 (from a TrueType font)
+    int glyph_size = 8;          // rows per glyph in the 8x8 mode (6..16)
+    std::string icon = "♪";   // symbol before the header; "" hides it
     std::string export_path;
     std::string save_lrc_dir;
     std::string style = "soft";
@@ -145,6 +153,10 @@ Options parse_args(int argc, char** argv) {
         else if (a == "--clean") o.no_artist = o.no_source = o.no_missing = true;
         else if (a == "--align") o.left = need() == "left";
         else if (a == "--vpos") o.vpos = std::stoi(need());
+        else if (a == "--scale") o.scale = std::stoi(need());
+        else if (a == "--glyphs") o.glyphs = need();
+        else if (a == "--glyph-size") o.glyph_size = std::stoi(need());
+        else if (a == "--icon") o.icon = need();
         else if (a == "--no-bold") o.no_bold = true;
         else if (a == "--mode") o.word_mode = need() == "word";
         else if (a == "--renderer") o.kitty = need() == "kitty";
@@ -158,7 +170,7 @@ Options parse_args(int argc, char** argv) {
     else if (a == "--no-config") {}
         else if (a == "--backend") {
             o.backend = need();
-            if (o.backend != "auto" && o.backend != "local" && o.backend != "lrclib")
+            if (o.backend != "auto" && o.backend != "local" && o.backend != "lrclib" && o.backend != "spicy")
                 throw std::runtime_error("--backend must be auto, local or lrclib");
         }
         else if (a == "--lyrics-dir") o.lyrics_dir = need();
@@ -245,6 +257,21 @@ std::string fmt_offset(double v) {
 
 }  // namespace
 
+// A monospace TrueType font for the 8x8 glyphs, when --font is not given
+static std::string default_mono_font() {
+#ifdef _WIN32
+    const char* candidates[] = {"C:\\Windows\\Fonts\\consola.ttf", "C:\\Windows\\Fonts\\cour.ttf"};
+#else
+    const char* candidates[] = {"/usr/share/fonts/TTF/DejaVuSansMono.ttf",
+                                "/usr/share/fonts/noto/NotoSansMono-Regular.ttf",
+                                "/usr/share/fonts/TTF/DejaVuSans-Bold.ttf"};
+#endif
+    for (const char* c : candidates) {
+        if (file_readable(c)) return c;
+    }
+    return "";
+}
+
 int main(int argc, char** argv) {
     try {
         std::vector<std::string> merged;
@@ -259,6 +286,22 @@ int main(int argc, char** argv) {
     merged_argv.push_back(nullptr);
     Options o = parse_args(static_cast<int>(merged.size()), merged_argv.data());
         util::g_vpos = std::clamp(o.vpos, 0, 100);
+        block::set_scale(o.scale);
+#ifndef LT_SPICY
+        if (o.backend == "spicy") {
+            std::fprintf(stderr, "error: --backend spicy needs a private build (meson setup -Dspicy=true)\n");
+            return 1;
+        }
+#endif
+        if (o.glyphs == "8x8") {
+            const std::string font = o.font.empty() ? default_mono_font() : o.font;
+            if (glyphs8::load(font)) {
+                glyphs8::set_size(o.glyph_size);
+                block::set_eight(true);
+            } else {
+                std::cerr << "8x8 font not found (use --font PATH), using 5x5\n";
+            }
+        }
         if (o.lyrics_dir.empty()) {
             const std::string home = home_dir();
             o.lyrics_dir = home.empty() ? std::string() : home + "/Lyrics";
@@ -444,11 +487,11 @@ int main(int argc, char** argv) {
                         j.key = key;
                         j.artist = p->artist;
                         j.title = p->title;
-                        std::string artist = p->artist, title = p->title;
+                        std::string artist = p->artist, title = p->title, track = p->track_id;
                         j.result = std::async(std::launch::async,
-                            [artist, title, backend = o.backend, dir = o.lyrics_dir]() -> std::optional<std::string> {
+                            [artist, title, track, backend = o.backend, dir = o.lyrics_dir]() -> std::optional<std::string> {
                                 if (artist.empty()) return std::string();
-                                return lyrics::load_track(artist, title, backend, dir);
+                                return lyrics::load_track(artist, title, backend, dir, track);
                             });
                         jobs.push_back(std::move(j));
                     }
@@ -466,11 +509,14 @@ int main(int argc, char** argv) {
 
             std::string header;
             if (!o.no_header) {
-                header = "🎵 ";
+                header = o.icon.empty() ? std::string() : o.icon + " ";
                 header += o.no_artist ? p->title : p->artist + " — " + p->title;
                 if (!o.no_source) header += "  · " + p->name;
                 if (offset != 0.0) header += "  · shift " + fmt_offset(offset);
                 if (secret) header += "  · ♪";
+#ifdef LT_SPICY
+                if (!spicy::attribution().empty()) header += "  · " + spicy::attribution();
+#endif
                 if (variants_loaded && variants.size() > 1)
                     header += "  · version " + std::to_string(variant_idx + 1) + "/" + std::to_string(variants.size());
                 else if (!variant_note.empty())

@@ -108,6 +108,17 @@ private:
         return reply;
     }
 
+    // Spotify track id from "https://open.spotify.com/track/<id>", or "" for any other URL
+    static std::string track_from_url(const std::string& url) {
+        const std::string marker = "open.spotify.com/track/";
+        const auto pos = url.find(marker);
+        if (pos == std::string::npos) return "";
+        std::string id = url.substr(pos + marker.size());
+        const auto end = id.find_first_of("?/");
+        if (end != std::string::npos) id = id.substr(0, end);
+        return id;
+    }
+
     static void read_metadata(DBusMessageIter* dict, PlayerInfo& info) {
         while (dbus_message_iter_get_arg_type(dict) == DBUS_TYPE_DICT_ENTRY) {
             DBusMessageIter entry, val;
@@ -120,6 +131,8 @@ private:
                 int t = dbus_message_iter_get_arg_type(&val);
                 if (key == "xesam:title" && t == DBUS_TYPE_STRING) {
                     info.title = basic_str(&val);
+                } else if (key == "xesam:url" && t == DBUS_TYPE_STRING) {
+                    info.track_id = track_from_url(basic_str(&val));
                 } else if (key == "xesam:artist" && t == DBUS_TYPE_ARRAY) {
                     DBusMessageIter arr;
                     dbus_message_iter_recurse(&val, &arr);

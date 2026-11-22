@@ -10,10 +10,42 @@
 #include "glyphs.hpp"
 #include "util.hpp"
 
+#include "glyphs8.hpp"
+
 namespace block {
+
+// 8x8 glyphs from a TrueType font (--glyphs 8x8)
+inline bool g_eight = false;
+
+inline void set_eight(bool on) {
+    g_eight = on;
+}
+
+// Size of one pixel in terminal cells (1..4), set with --scale
+inline int g_scale = 1;
+
+inline void set_scale(int s) {
+    g_scale = s < 1 ? 1 : (s > 4 ? 4 : s);
+}
 
 // 5 ASCII rows ('#' and ' ') for the text. Each glyph has a one-cell gap on the right
 inline std::vector<std::string> text_to_rows(const std::string& text) {
+    if (g_eight) {
+        // 8x8 glyphs: a pixel is two cells wide, so the pixels look square
+        const int n = glyphs8::g_size;
+        std::vector<std::string> rows(static_cast<size_t>(n));
+        for (char32_t cp : util::decode_utf8(text)) {
+            const auto& g = glyphs8::rows(util::to_upper(cp));
+            for (int i = 0; i < n; ++i) {
+                for (char ch : g[i]) {
+                    rows[i] += ch;
+                    rows[i] += ch;
+                }
+                rows[i] += "  ";
+            }
+        }
+        return rows;
+    }
     std::vector<std::string> rows(5);
     for (char32_t cp : util::decode_utf8(text)) {
         char32_t c = util::to_upper(cp);
@@ -32,8 +64,20 @@ inline std::vector<std::string> text_to_rows(const std::string& text) {
     return rows;
 }
 
+// Width of the text in terminal columns, with the scale applied
 inline int text_width(const std::string& text) {
-    return static_cast<int>(text_to_rows(text)[0].size());
+    return static_cast<int>(text_to_rows(text)[0].size()) * g_scale;
+}
+
+// Pixel rows with each pixel stretched to g_scale x g_scale cells
+inline std::vector<std::string> scaled_rows(const std::string& text) {
+    std::vector<std::string> out;
+    for (const auto& row : text_to_rows(text)) {
+        std::string wide;
+        for (char c : row) wide.append(static_cast<size_t>(g_scale), c);
+        for (int k = 0; k < g_scale; ++k) out.push_back(wide);
+    }
+    return out;
 }
 
 // Splits text into lines that fit the terminal. Long words are split by characters
@@ -111,7 +155,7 @@ inline void draw(const std::string& text, const std::string& header, const std::
     auto chunks = wrap_words(text, t.cols);
     for (size_t n = 0; n < chunks.size(); ++n) {
         if (n) body.push_back({"", 0});
-        for (const auto& row : text_to_rows(chunks[n]))
+        for (const auto& row : scaled_rows(chunks[n]))
             body.push_back({style + to_block_chars(row) + "\033[0m", static_cast<int>(row.size())});
     }
 
@@ -122,12 +166,30 @@ inline void draw(const std::string& text, const std::string& header, const std::
     auto pad = [&](int width) { return std::string(left ? 2 : std::max(0, (t.cols - width) / 2), ' '); };
     auto cw = [](const std::string& s) { return static_cast<int>(util::codepoints(s)); };
 
-    std::string out = "\033[2J\033[H" + std::string(top, '\n');
-    if (!header.empty()) out += pad(cw(header)) + "\033[2m" + header + "\033[0m\n\n";
-    if (!prev.empty()) out += pad(cw(prev)) + "\033[2m" + prev + "\033[0m\n\n";
-    for (const auto& line : body) out += pad(line.width) + line.text + "\n";
-    if (!note.empty()) out += pad(cw(note)) + "\033[2m" + note + "\033[0m\n";
-    if (!next.empty()) out += "\n" + pad(cw(next)) + "\033[2m" + next + "\033[0m\n";
+    // Every line is placed by its absolute row (ESC[row;1H), so no newline is ever printed:
+    // line feeds in some Windows consoles do not return to column 1 and frames drift
+    int row = top;
+    // Clear the whole screen first: a shorter frame (or no block at all) must not leave old lines behind.
+    // On the alternate screen this does not touch the scrollback
+    std::string out = "\033[1;1H\033[J";
+    auto put = [&](const std::string& text) {
+        out += "\033[" + std::to_string(++row) + ";1H" + text + "\033[K";
+    };
+    if (!header.empty()) {
+        put(pad(cw(header)) + "\033[2m" + header + "\033[0m");
+        put("");
+    }
+    if (!prev.empty()) {
+        put(pad(cw(prev)) + "\033[2m" + prev + "\033[0m");
+        put("");
+    }
+    for (const auto& line : body) put(pad(line.width) + line.text);
+    if (!note.empty()) put(pad(cw(note)) + "\033[2m" + note + "\033[0m");
+    if (!next.empty()) {
+        put("");
+        put(pad(cw(next)) + "\033[2m" + next + "\033[0m");
+    }
+    out += "\033[J";
 
     std::fwrite(out.data(), 1, out.size(), stdout);
     std::fflush(stdout);

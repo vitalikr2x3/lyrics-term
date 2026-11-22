@@ -13,6 +13,7 @@ struct PlayerInfo {
     std::string title;
     std::string status;   // Playing / Paused / Stopped
     double position = 0;  // seconds
+    std::string track_id; // Spotify track id, when the player reports one (MPRIS xesam:url)
 };
 
 // Player: `wanted` is a lowercase substring of the name ("" = any player).
